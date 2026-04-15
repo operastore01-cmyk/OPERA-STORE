@@ -2381,6 +2381,27 @@ window.sendWA = sendWA;
 window.sendSavWA = sendSavWA;
 window.openStaffSettingsModal = openStaffSettingsModal;
 window.changeStaffPassword = changeStaffPassword;
+  // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCUi3kogTKbON6HyKNXmIrgtyAVoI9h0t0",
+  authDomain: "opera-store-7e04d.firebaseapp.com",
+  projectId: "opera-store-7e04d",
+  storageBucket: "opera-store-7e04d.firebasestorage.app",
+  messagingSenderId: "515326654060",
+  appId: "1:515326654060:web:16d1eb1b533595483b0a49",
+  measurementId: "G-H77QC9Z1V3"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 </script>
 </body>
 </html>
