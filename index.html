@@ -1129,7 +1129,7 @@ input, textarea, select { font-size: 0.88rem !important; }
 <!-- ===== Firebase SDK ===== -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCUi3kogTKbON6HyKNXmIrgtyAVoI9h0t0",
@@ -1143,23 +1143,23 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
-// حفظ البيانات على Firebase + localStorage معاً
+// ===== حفظ على Firebase + localStorage =====
 window.fbSave = async function(key, data) {
   try {
-    localStorage.setItem('fb_' + key, JSON.stringify(data)); // نسخة محلية فورية
+    localStorage.setItem('fb_' + key, JSON.stringify(data));
     await setDoc(doc(db, "opera_store", key), { value: JSON.stringify(data) });
   } catch(e) {
     console.warn("Firebase save error:", e);
   }
 };
 
-// تحميل من Firebase، فإذا فشل يرجع للـ localStorage
+// ===== تحميل من Firebase مع localStorage كـ fallback =====
 window.fbLoad = async function(key, localKey) {
   try {
     const snap = await getDoc(doc(db, "opera_store", key));
     if(snap.exists()) {
       const data = JSON.parse(snap.data().value);
-      localStorage.setItem(localKey || key, JSON.stringify(data)); // تحديث النسخة المحلية
+      localStorage.setItem(localKey || key, JSON.stringify(data));
       return data;
     }
   } catch(e) {
@@ -1169,13 +1169,52 @@ window.fbLoad = async function(key, localKey) {
   return local ? JSON.parse(local) : null;
 };
 
-// تحميل كل البيانات عند فتح الصفحة
+// ===== مزامنة تلقائية في الخلفية =====
+// بعد ما التطبيق يشتغل، بنستمع لأي تغييرات من Firebase ونحدّث التطبيق تلقائياً
+window.startRealtimeSync = function() {
+  const keys = [
+    { fbKey: 'customers', varName: 'customers' },
+    { fbKey: 'savings',   varName: 'savingsAccounts' },
+    { fbKey: 'trash',     varName: 'trashItems' },
+    { fbKey: 'staff',     varName: 'staffMembers' },
+    { fbKey: 'credentials', varName: 'USER_CREDENTIALS' },
+  ];
+
+  keys.forEach(({ fbKey, varName }) => {
+    onSnapshot(doc(db, "opera_store", fbKey), (snap) => {
+      if(!snap.exists() || !window.appInitialized) return;
+      try {
+        const newData = JSON.parse(snap.data().value);
+        // تحديث المتغير العالمي
+        if(varName === 'customers') {
+          customers = newData;
+          window._fbCustomers = newData;
+          render();
+        } else if(varName === 'savingsAccounts') {
+          savingsAccounts = newData;
+          window._fbSavings = newData;
+        } else if(varName === 'trashItems') {
+          trashItems = newData;
+          window._fbTrash = newData;
+          updateTrashBadge();
+        } else if(varName === 'staffMembers') {
+          staffMembers = newData;
+          window._fbStaff = newData;
+        } else if(varName === 'USER_CREDENTIALS') {
+          USER_CREDENTIALS = newData;
+          window._fbCredentials = newData;
+        }
+      } catch(e) {}
+    });
+  });
+};
+
+// ===== تحميل كل البيانات عند فتح الصفحة =====
 window.loadAllFromFirebase = async function() {
   const errEl = document.getElementById('fb-error-msg');
   const loadEl = document.getElementById('fb-loading');
   const loginEl = document.getElementById('login-screen');
 
-  // اخفي الـ login لحد ما Firebase يخلص
   if(loginEl) loginEl.style.display = 'none';
   if(loadEl) loadEl.style.display = 'flex';
 
@@ -1193,7 +1232,7 @@ window.loadAllFromFirebase = async function() {
     if(creds && creds.username) window._fbCredentials = creds;
     if(staff) window._fbStaff = staff;
 
-    // طبّق البيانات على المتغيرات مباشرةً
+    // تطبيق البيانات على المتغيرات مباشرةً
     if(window._fbCustomers && typeof customers !== 'undefined') customers = window._fbCustomers;
     if(window._fbSavings && typeof savingsAccounts !== 'undefined') savingsAccounts = window._fbSavings;
     if(window._fbTrash && typeof trashItems !== 'undefined') trashItems = window._fbTrash;
@@ -1205,15 +1244,41 @@ window.loadAllFromFirebase = async function() {
       errEl.style.display = 'block';
       errEl.textContent = 'تعذر الاتصال بـ Firebase — سيتم استخدام البيانات المحلية';
     }
-    await new Promise(r => setTimeout(r, 1500)); // اظهر الرسالة شوية
+    await new Promise(r => setTimeout(r, 1500));
   } finally {
     window.firebaseReady = true;
     if(loadEl) loadEl.style.display = 'none';
-    // دلوقتي ظهّر شاشة الـ login
-    if(loginEl) {
-      loginEl.style.display = 'flex';
-      const uInput = document.getElementById('login-username');
-      if(uInput) uInput.focus();
+
+    // ===== تحقق من جلسة محفوظة =====
+    const SESSION_KEY = 'opera_session_v2';
+    const savedSession = localStorage.getItem(SESSION_KEY);
+    if(savedSession) {
+      try {
+        const sess = JSON.parse(savedSession);
+        const now = Date.now();
+        const hours12 = 12 * 60 * 60 * 1000;
+        if(sess.user && (now - sess.savedAt) < hours12) {
+          // الجلسة لسه شغالة — ادخل مباشرةً بدون login
+          window.currentUser = sess.user;
+          // تأكد إن المتغير currentUser موجود
+          if(typeof currentUser !== 'undefined') currentUser = sess.user;
+          window._autoLogin = sess.user;
+        }
+      } catch(e) {}
+    }
+
+    if(window._autoLogin) {
+      // أظهر التطبيق مباشرةً بدون شاشة login
+      if(loginEl) loginEl.style.display = 'none';
+      const appEl = document.getElementById('app-main');
+      if(appEl) appEl.style.display = 'block';
+      // currentUser سيُعيَّن من الـ script الرئيسي لما يشوف _autoLogin
+    } else {
+      if(loginEl) {
+        loginEl.style.display = 'flex';
+        const uInput = document.getElementById('login-username');
+        if(uInput) uInput.focus();
+      }
     }
   }
 };
@@ -1305,10 +1370,8 @@ function attemptLogin() {
   } else {
     const staff = staffMembers.find(s => s.username === u);
     if(staff) {
-      if(p === '1234' || p === staff.password) {
-        if(p === '1234' && !staff.passwordChanged) {
-          // First login, allow
-        }
+      const validPassword = staff.passwordChanged ? (p === staff.password) : (p === '1234' || p === staff.password);
+      if(validPassword) {
         currentUser = { username: u, isAdmin: false, permissions: staff.permissions, staffId: staff.id, staffName: staff.name };
         saveRememberedUsername(u, false);
         loginSuccess();
@@ -1322,13 +1385,16 @@ function attemptLogin() {
 }
 
 function loginSuccess() {
-  // Firebase جاهز دايماً هنا لأن شاشة الـ login ما بتظهرش إلا بعد ما Firebase يخلص
-  // تأكد إن البيانات متطبقة
   if(window._fbCustomers) customers = window._fbCustomers;
   if(window._fbSavings) savingsAccounts = window._fbSavings;
   if(window._fbTrash) trashItems = window._fbTrash;
   if(window._fbStaff) staffMembers = window._fbStaff;
   if(window._fbCredentials) USER_CREDENTIALS = window._fbCredentials;
+
+  // حفظ الجلسة لمدة ١٢ ساعة
+  const SESSION_KEY = 'opera_session_v2';
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ user: currentUser, savedAt: Date.now() }));
+
   _doLoginSuccess();
 }
 
@@ -1340,6 +1406,8 @@ function _doLoginSuccess() {
   if(!window.appInitialized) {
     initApp();
     window.appInitialized = true;
+    // ابدأ المزامنة التلقائية في الخلفية
+    if(window.startRealtimeSync) window.startRealtimeSync();
   } else {
     render();
     setHeaderDate();
@@ -1348,6 +1416,8 @@ function _doLoginSuccess() {
 }
 
 function logout() {
+  // مسح الجلسة المحفوظة
+  localStorage.removeItem('opera_session_v2');
   currentUser = { username: '', isAdmin: false, permissions: null };
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app-main').style.display = 'none';
@@ -2615,15 +2685,23 @@ function initApp() {
   render();
 }
 
-// شاشة الـ login هتظهر بعد ما Firebase يخلص التحميل (في loadAllFromFirebase)
-// لو Firebase خلص قبل ما السكريبت يشتغل (نادر بس ممكن)، ظهّر الـ login فوراً
+// شاشة الـ login هتظهر بعد ما Firebase يخلص (أو auto-login لو في جلسة محفوظة)
 document.getElementById('app-main').style.display = 'none';
-if(window.firebaseReady) {
+document.getElementById('login-screen').style.display = 'none';
+
+// لو Firebase خلص بالفعل وفيه auto-login، شغّل التطبيق
+if(window.firebaseReady && window._autoLogin) {
+  currentUser = window._autoLogin;
+  document.getElementById('app-main').style.display = 'block';
+  initApp();
+  window.appInitialized = true;
+  applyPermissions();
+  if(window.startRealtimeSync) window.startRealtimeSync();
+} else if(window.firebaseReady) {
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('login-username').focus();
-} else {
-  document.getElementById('login-screen').style.display = 'none';
 }
+// لو Firebase لسه بيحمّل، هو هيتكفل يظهر الـ login أو يعمل auto-login
 
 // Global functions for HTML onclick
 window.toggleTheme = toggleTheme;
