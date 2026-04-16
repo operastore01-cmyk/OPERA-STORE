@@ -1172,6 +1172,13 @@ window.fbLoad = async function(key, localKey) {
 // تحميل كل البيانات عند فتح الصفحة
 window.loadAllFromFirebase = async function() {
   const errEl = document.getElementById('fb-error-msg');
+  const loadEl = document.getElementById('fb-loading');
+  const loginEl = document.getElementById('login-screen');
+
+  // اخفي الـ login لحد ما Firebase يخلص
+  if(loginEl) loginEl.style.display = 'none';
+  if(loadEl) loadEl.style.display = 'flex';
+
   try {
     const [c, s, t, creds, staff] = await Promise.all([
       window.fbLoad('customers', 'inst_manager_v2_data'),
@@ -1185,15 +1192,29 @@ window.loadAllFromFirebase = async function() {
     if(t) window._fbTrash = t;
     if(creds && creds.username) window._fbCredentials = creds;
     if(staff) window._fbStaff = staff;
+
+    // طبّق البيانات على المتغيرات مباشرةً
+    if(window._fbCustomers && typeof customers !== 'undefined') customers = window._fbCustomers;
+    if(window._fbSavings && typeof savingsAccounts !== 'undefined') savingsAccounts = window._fbSavings;
+    if(window._fbTrash && typeof trashItems !== 'undefined') trashItems = window._fbTrash;
+    if(window._fbStaff && typeof staffMembers !== 'undefined') staffMembers = window._fbStaff;
+    if(window._fbCredentials && typeof USER_CREDENTIALS !== 'undefined') USER_CREDENTIALS = window._fbCredentials;
+
   } catch(e) {
     if(errEl) {
       errEl.style.display = 'block';
       errEl.textContent = 'تعذر الاتصال بـ Firebase — سيتم استخدام البيانات المحلية';
     }
+    await new Promise(r => setTimeout(r, 1500)); // اظهر الرسالة شوية
   } finally {
     window.firebaseReady = true;
-    const loadEl = document.getElementById('fb-loading');
     if(loadEl) loadEl.style.display = 'none';
+    // دلوقتي ظهّر شاشة الـ login
+    if(loginEl) {
+      loginEl.style.display = 'flex';
+      const uInput = document.getElementById('login-username');
+      if(uInput) uInput.focus();
+    }
   }
 };
 
@@ -1301,25 +1322,13 @@ function attemptLogin() {
 }
 
 function loginSuccess() {
-  // لو Firebase لسه بيحمّل، استنى وبعدين ادخل
-  if(!window.firebaseReady) {
-    const loadEl = document.getElementById('fb-loading');
-    if(loadEl) loadEl.style.display = 'flex';
-    const wait = setInterval(() => {
-      if(window.firebaseReady) {
-        clearInterval(wait);
-        if(loadEl) loadEl.style.display = 'none';
-        // تطبيق البيانات الجديدة من Firebase
-        if(window._fbCustomers) customers = window._fbCustomers;
-        if(window._fbSavings) savingsAccounts = window._fbSavings;
-        if(window._fbTrash) trashItems = window._fbTrash;
-        if(window._fbStaff) staffMembers = window._fbStaff;
-        if(window._fbCredentials) USER_CREDENTIALS = window._fbCredentials;
-        _doLoginSuccess();
-      }
-    }, 150);
-    return;
-  }
+  // Firebase جاهز دايماً هنا لأن شاشة الـ login ما بتظهرش إلا بعد ما Firebase يخلص
+  // تأكد إن البيانات متطبقة
+  if(window._fbCustomers) customers = window._fbCustomers;
+  if(window._fbSavings) savingsAccounts = window._fbSavings;
+  if(window._fbTrash) trashItems = window._fbTrash;
+  if(window._fbStaff) staffMembers = window._fbStaff;
+  if(window._fbCredentials) USER_CREDENTIALS = window._fbCredentials;
   _doLoginSuccess();
 }
 
@@ -1547,11 +1556,11 @@ function changeStaffPassword() {
 }
 
 // ===== APP LOGIC =====
-// البيانات: Firebase أولاً، localStorage ثانياً كـ fallback
+// البيانات: Firebase أولاً (محمّلة قبل كده)، localStorage ثانياً كـ fallback
 let customers = (window._fbCustomers) || JSON.parse(localStorage.getItem('inst_manager_v2_data')) || [];
 let savingsAccounts = (window._fbSavings) || JSON.parse(localStorage.getItem('savings_v2_data')) || [];
 let trashItems = (window._fbTrash) || JSON.parse(localStorage.getItem('opera_trash_v1')) || [];
-// تطبيق بيانات الموظفين من Firebase لو موجودة
+// تطبيق بيانات الموظفين والـ credentials من Firebase لو موجودة
 if(window._fbStaff) staffMembers = window._fbStaff;
 if(window._fbCredentials) USER_CREDENTIALS = window._fbCredentials;
 let activeCustomerId = null, currentDayFilter = null, currentMsgDayFilter = null, activeSavingsId = null;
@@ -2606,10 +2615,15 @@ function initApp() {
   render();
 }
 
-// Start with login screen visible
-document.getElementById('login-screen').style.display = 'flex';
+// شاشة الـ login هتظهر بعد ما Firebase يخلص التحميل (في loadAllFromFirebase)
+// لو Firebase خلص قبل ما السكريبت يشتغل (نادر بس ممكن)، ظهّر الـ login فوراً
 document.getElementById('app-main').style.display = 'none';
-document.getElementById('login-username').focus();
+if(window.firebaseReady) {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-username').focus();
+} else {
+  document.getElementById('login-screen').style.display = 'none';
+}
 
 // Global functions for HTML onclick
 window.toggleTheme = toggleTheme;
