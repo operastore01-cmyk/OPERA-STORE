@@ -1417,7 +1417,6 @@ window.startRealtimeSync = function() {
       if(!snap.exists() || !window.appInitialized) return;
       try {
         const newData = JSON.parse(snap.data().value);
-        // تحديث المتغير العالمي
         if(varName === 'customers') {
           customers = newData;
           window._fbCustomers = newData;
@@ -1438,6 +1437,20 @@ window.startRealtimeSync = function() {
         }
       } catch(e) {}
     });
+  });
+
+  // مزامنة سجل النشاط تلقائياً — لو العميل دخل من customer.html يظهر هنا فوراً
+  onSnapshot(doc(db, "opera_store", "activity_log"), (snap) => {
+    if(!snap.exists() || !window.appInitialized) return;
+    try {
+      const newData = JSON.parse(snap.data().value);
+      localStorage.setItem('opera_activity_log', JSON.stringify(newData));
+      // لو السجل مفتوح، حدّثه تلقائياً
+      const actModal = document.getElementById('activity-modal');
+      if(actModal && actModal.classList.contains('open')) {
+        renderActivityLog(window._actTab || 'staff');
+      }
+    } catch(e) {}
   });
 };
 
@@ -3033,8 +3046,18 @@ function openActivityLog() {
   closeM('menu-modal');
   window._actTab = 'staff';
   document.getElementById('act-search').value = '';
-  renderActivityLog('staff');
+  document.getElementById('activity-list').innerHTML = '<div class="empty"><i class="fa-solid fa-spinner fa-spin"></i><p>جاري التحميل...</p></div>';
   openM('activity-modal');
+
+  // جلب أحدث سجل من Firebase أولاً ثم عرضه
+  if(window.fbLoad) {
+    window.fbLoad('activity_log', 'opera_activity_log').then(data => {
+      if(data) localStorage.setItem('opera_activity_log', JSON.stringify(data));
+      renderActivityLog('staff');
+    }).catch(() => renderActivityLog('staff'));
+  } else {
+    renderActivityLog('staff');
+  }
 }
 
 function renderActivityLog(tab) {
