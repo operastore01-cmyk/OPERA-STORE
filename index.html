@@ -893,6 +893,7 @@ input, textarea, select { font-size: 0.88rem !important; }
     <button class="menu-btn" onclick="openOffers()"><i class="fa-solid fa-bullhorn" style="color:var(--orange)"></i> العروض والترويج</button>
     <button class="menu-btn" onclick="openCustomMsgs()"><i class="fa-solid fa-comment-dots" style="color:var(--green)"></i> رسائل مخصصة</button>
     <button class="menu-btn" id="menu-logs-btn" onclick="openLogs()"><i class="fa-solid fa-receipt" style="color:var(--blue)"></i> سجل العمليات</button>
+    <button class="menu-btn" id="menu-activity-btn" onclick="openActivityLog()"><i class="fa-solid fa-shield-halved" style="color:var(--pink)"></i> سجل النشاط</button>
     <button class="menu-btn" onclick="showOverdueList()">
       <i class="fa-solid fa-clock-rotate-left" style="color:var(--red)"></i> قائمة المتأخرين
       <span id="overdue-badge" class="badge" style="background:rgba(248,113,113,0.15);color:var(--red)"></span>
@@ -905,6 +906,37 @@ input, textarea, select { font-size: 0.88rem !important; }
     <button class="menu-btn" id="menu-creds-btn" onclick="openCredentialsModal()"><i class="fa-solid fa-user-lock" style="color:var(--accent2)"></i> المستخدم</button>
     <!-- زر الإعدادات للموظف فقط -->
     <button class="menu-btn" id="menu-staff-settings-btn" onclick="openStaffSettingsModal()" style="display:none;"><i class="fa-solid fa-gear" style="color:var(--accent2)"></i> الإعدادات</button>
+  </div>
+</div>
+
+<!-- ===== ACTIVITY LOG MODAL ===== -->
+<div class="modal-overlay" id="activity-modal">
+  <div class="modal-panel">
+    <div class="back-btn" onclick="closeToMenu('activity-modal')">رجوع</div>
+    <div class="modal-title"><i class="fa-solid fa-shield-halved" style="color:var(--pink)"></i> سجل النشاط</div>
+
+    <!-- تبويبات -->
+    <div class="coll-tabs" style="grid-template-columns:1fr 1fr;margin-bottom:16px">
+      <button id="act-tab-staff" class="tab-btn active" onclick="renderActivityLog('staff')">
+        <i class="fa-solid fa-user-tie"></i> المدير والموظفين
+      </button>
+      <button id="act-tab-customers" class="tab-btn" onclick="renderActivityLog('customers')">
+        <i class="fa-solid fa-users"></i> العملاء
+      </button>
+    </div>
+
+    <!-- فلتر + عداد -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+      <input type="text" id="act-search" placeholder="بحث..." oninput="renderActivityLog(window._actTab||'staff')" style="flex:1;min-height:36px;font-size:0.8rem">
+      <div id="act-count" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;font-size:0.75rem;font-weight:700;color:var(--accent2);white-space:nowrap">0 حدث</div>
+    </div>
+
+    <div id="activity-list"></div>
+
+    <!-- زر مسح السجل -->
+    <button onclick="clearActivityLog()" style="margin-top:16px;width:100%;background:transparent;border:1px solid var(--red);color:var(--red);border-radius:var(--radius);padding:10px;font-family:'Cairo',sans-serif;font-size:0.8rem;cursor:pointer;">
+      <i class="fa-solid fa-trash"></i> مسح السجل
+    </button>
   </div>
 </div>
 
@@ -1419,18 +1451,20 @@ window.loadAllFromFirebase = async function() {
   if(loadEl) loadEl.style.display = 'flex';
 
   try {
-    const [c, s, t, creds, staff] = await Promise.all([
+    const [c, s, t, creds, staff, actLog] = await Promise.all([
       window.fbLoad('customers', 'inst_manager_v2_data'),
       window.fbLoad('savings', 'savings_v2_data'),
       window.fbLoad('trash', 'opera_trash_v1'),
       window.fbLoad('credentials', 'opera_user_creds'),
       window.fbLoad('staff', 'opera_staff_v1'),
+      window.fbLoad('activity_log', 'opera_activity_log'),
     ]);
     if(c) window._fbCustomers = c;
     if(s) window._fbSavings = s;
     if(t) window._fbTrash = t;
     if(creds && creds.username) window._fbCredentials = creds;
     if(staff) window._fbStaff = staff;
+    if(actLog) localStorage.setItem('opera_activity_log', JSON.stringify(actLog));
 
     // تطبيق البيانات على المتغيرات مباشرةً
     if(window._fbCustomers && typeof customers !== 'undefined') customers = window._fbCustomers;
@@ -1590,16 +1624,16 @@ function attemptLogin() {
   const isCustomerTab = document.getElementById('tab-customer').classList.contains('active');
 
   if(isCustomerTab) {
-    // دخول العميل برقم الهاتف
-    const phone = u.replace(/\D/g, ''); // أرقام فقط
+    const phone = u.replace(/\D/g, '');
     const cust = customers.find(c => {
       const cp = (c.phone||'').replace(/\D/g, '');
       return cp === phone || cp === phone.replace(/^0/, '2') || phone === cp.replace(/^2/, '0');
     });
-    if(!cust) { err.textContent = '❌ رقم الهاتف غير مسجل'; return; }
+    if(!cust) { err.textContent = '❌ رقم الهاتف غير مسجل'; logActivity('customer_fail', {phone: u, reason: 'رقم غير مسجل'}); return; }
     if(!cust.portalPassword) { err.textContent = '❌ البوابة غير مفعّلة لهذا الحساب — تواصل مع المتجر'; return; }
-    if(p !== cust.portalPassword) { err.textContent = '❌ كلمة المرور غير صحيحة'; return; }
+    if(p !== cust.portalPassword) { err.textContent = '❌ كلمة المرور غير صحيحة'; logActivity('customer_fail', {phone: u, name: cust.name, reason: 'كلمة مرور خاطئة'}); return; }
     // دخول ناجح
+    logActivity('customer_login', {name: cust.name, phone: cust.phone, custId: cust.id});
     currentUser = { username: phone, isAdmin: false, isCustomer: true, customerId: cust.id, customerName: cust.name };
     saveRememberedUsername(u, false);
     localStorage.setItem('opera_session_v2', JSON.stringify({ user: currentUser, savedAt: Date.now() }));
@@ -1611,9 +1645,11 @@ function attemptLogin() {
   if(isAdminTab) {
     if(u === USER_CREDENTIALS.username && p === USER_CREDENTIALS.password) {
       currentUser = { username: u, isAdmin: true, permissions: null };
+      logActivity('admin_login', {username: u});
       saveRememberedUsername(u, true);
       loginSuccess();
     } else {
+      logActivity('admin_fail', {username: u, reason: 'بيانات دخول خاطئة'});
       err.textContent = '❌ اسم المستخدم أو كلمة المرور غير صحيحة';
     }
   } else {
@@ -1622,12 +1658,15 @@ function attemptLogin() {
       const validPassword = staff.passwordChanged ? (p === staff.password) : (p === '1234' || p === staff.password);
       if(validPassword) {
         currentUser = { username: u, isAdmin: false, permissions: staff.permissions, staffId: staff.id, staffName: staff.name };
+        logActivity('staff_login', {username: u, name: staff.name});
         saveRememberedUsername(u, false);
         loginSuccess();
       } else {
+        logActivity('staff_fail', {username: u, reason: 'كلمة مرور خاطئة'});
         err.textContent = '❌ كلمة المرور غير صحيحة';
       }
     } else {
+      logActivity('staff_fail', {username: u, reason: 'مستخدم غير موجود'});
       err.textContent = '❌ اسم المستخدم غير موجود';
     }
   }
@@ -1688,6 +1727,7 @@ function applyPermissions() {
   document.getElementById('data-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('report-btn').style.display = (isAdmin || perms.canViewReport) ? 'flex' : 'none';
   document.getElementById('menu-logs-btn').style.display = isAdmin ? 'flex' : 'none';
+  document.getElementById('menu-activity-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('menu-pdf-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('menu-trash-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('menu-staff-btn').style.display = isAdmin ? 'flex' : 'none';
@@ -2964,6 +3004,117 @@ if(window.firebaseReady && window._autoLogin) {
 }
 // لو Firebase لسه بيحمّل، هو هيتكفل يظهر الـ login أو يعمل auto-login
 
+// ===== ACTIVITY LOG =====
+const ACTIVITY_KEY = 'opera_activity_log';
+const MAX_LOGS = 500;
+
+function logActivity(type, data = {}) {
+  try {
+    const logs = JSON.parse(localStorage.getItem(ACTIVITY_KEY) || '[]');
+    const entry = {
+      type,
+      ...data,
+      ts: Date.now(),
+      time: new Date().toLocaleString('ar-EG', {
+        day:'2-digit', month:'2-digit', year:'numeric',
+        hour:'2-digit', minute:'2-digit', hour12: true
+      })
+    };
+    logs.unshift(entry);
+    if(logs.length > MAX_LOGS) logs.splice(MAX_LOGS);
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(logs));
+    // حفظ على Firebase برضو
+    if(window.fbSave) window.fbSave('activity_log', logs);
+  } catch(e) {}
+}
+
+function openActivityLog() {
+  if(!currentUser.isAdmin) { showToast('المدير فقط', 'error', 'fa-lock'); return; }
+  closeM('menu-modal');
+  window._actTab = 'staff';
+  document.getElementById('act-search').value = '';
+  renderActivityLog('staff');
+  openM('activity-modal');
+}
+
+function renderActivityLog(tab) {
+  window._actTab = tab;
+  document.getElementById('act-tab-staff').classList.toggle('active', tab === 'staff');
+  document.getElementById('act-tab-customers').classList.toggle('active', tab === 'customers');
+
+  const q = (document.getElementById('act-search').value || '').toLowerCase();
+  let logs = [];
+  try { logs = JSON.parse(localStorage.getItem(ACTIVITY_KEY) || '[]'); } catch(e) {}
+
+  // فلترة حسب التبويب
+  const staffTypes = ['admin_login','admin_fail','staff_login','staff_fail'];
+  const custTypes  = ['customer_login','customer_fail'];
+  const filtered = logs.filter(l => {
+    const inTab = tab === 'staff' ? staffTypes.includes(l.type) : custTypes.includes(l.type);
+    if(!inTab) return false;
+    if(!q) return true;
+    return (l.name||'').toLowerCase().includes(q) ||
+           (l.username||'').toLowerCase().includes(q) ||
+           (l.phone||'').includes(q) ||
+           (l.reason||'').toLowerCase().includes(q);
+  });
+
+  document.getElementById('act-count').textContent = filtered.length + ' حدث';
+
+  if(!filtered.length) {
+    document.getElementById('activity-list').innerHTML =
+      '<div class="empty"><i class="fa-solid fa-shield-halved"></i><p>لا توجد أحداث مسجلة</p></div>';
+    return;
+  }
+
+  const typeConfig = {
+    admin_login:    { icon: 'fa-crown',          color: 'var(--accent2)', label: 'دخول مدير',        bg: 'rgba(167,139,250,0.1)'  },
+    admin_fail:     { icon: 'fa-triangle-exclamation', color: 'var(--red)',    label: 'محاولة دخول فاشلة (مدير)', bg: 'rgba(248,113,113,0.08)' },
+    staff_login:    { icon: 'fa-user-tie',        color: 'var(--blue)',    label: 'دخول موظف',        bg: 'rgba(96,165,250,0.08)'  },
+    staff_fail:     { icon: 'fa-triangle-exclamation', color: 'var(--orange)', label: 'محاولة دخول فاشلة (موظف)', bg: 'rgba(251,146,60,0.08)'  },
+    customer_login: { icon: 'fa-user',            color: 'var(--green)',   label: 'دخول عميل',        bg: 'rgba(52,211,153,0.08)'  },
+    customer_fail:  { icon: 'fa-triangle-exclamation', color: 'var(--red)',    label: 'محاولة دخول فاشلة (عميل)', bg: 'rgba(248,113,113,0.08)' },
+  };
+
+  document.getElementById('activity-list').innerHTML = filtered.map(l => {
+    const cfg = typeConfig[l.type] || { icon: 'fa-circle', color: 'var(--muted)', label: l.type, bg: 'transparent' };
+    const isSuccess = !l.type.includes('fail');
+    const mainLabel = tab === 'staff'
+      ? (l.name ? `${l.name} (@${l.username||''})` : (l.username || '--'))
+      : (l.name ? `${l.name}` : '--');
+    const subLabel = tab === 'staff'
+      ? (l.reason ? `<span style="color:var(--red);font-size:0.65rem">${l.reason}</span>` : '')
+      : (l.phone  ? `<span style="color:var(--muted);font-size:0.65rem">${l.phone}</span>` : '') +
+        (l.reason ? ` <span style="color:var(--red);font-size:0.65rem">— ${l.reason}</span>` : '');
+
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);background:${cfg.bg};margin-bottom:6px;border:1px solid var(--border)">
+      <div style="width:34px;height:34px;border-radius:50%;background:${cfg.bg};border:1px solid ${cfg.color}30;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i class="fa-solid ${cfg.icon}" style="color:${cfg.color};font-size:0.85rem"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.78rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${mainLabel}</div>
+        <div style="font-size:0.65rem;color:var(--muted);margin-top:1px">${cfg.label} ${subLabel}</div>
+      </div>
+      <div style="text-align:left;flex-shrink:0">
+        <div style="font-size:0.6rem;color:var(--muted);white-space:nowrap">${l.time||'--'}</div>
+        <div style="font-size:0.65rem;font-weight:700;color:${isSuccess?'var(--green)':'var(--red)'};text-align:center;margin-top:2px">
+          ${isSuccess ? '✓ نجح' : '✗ فشل'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function clearActivityLog() {
+  if(!currentUser.isAdmin) return;
+  if(confirm('مسح كل سجل النشاط؟ لا يمكن التراجع')) {
+    localStorage.setItem(ACTIVITY_KEY, '[]');
+    if(window.fbSave) window.fbSave('activity_log', []);
+    renderActivityLog(window._actTab || 'staff');
+    showToast('تم مسح السجل', 'success', 'fa-trash');
+  }
+}
+
 // ===== CUSTOMER PORTAL FUNCTIONS =====
 function openCustomerPortal(custId) {
   const c = customers.find(x => x.id === custId);
@@ -3139,6 +3290,9 @@ window.savePortalPassword = savePortalPassword;
 window.portalLogout = portalLogout;
 window.portalContactSupport = portalContactSupport;
 window.openCustomerPortal = openCustomerPortal;
+window.openActivityLog = openActivityLog;
+window.renderActivityLog = renderActivityLog;
+window.clearActivityLog = clearActivityLog;
 </script>
 </body>
 </html>
