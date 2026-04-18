@@ -566,6 +566,65 @@ select option { background:var(--surface2); }
 .empty i { font-size:2.5rem; margin-bottom:12px; display:block; opacity:0.3; }
 .empty p { font-size:0.85rem; }
 
+/* ===== DAILY REMINDER BANNER ===== */
+.daily-banner {
+  background: linear-gradient(135deg, rgba(124,107,255,0.12), rgba(167,139,250,0.06));
+  border: 1px solid rgba(124,107,255,0.25); border-radius: var(--radius);
+  padding: 10px 14px; margin-bottom: 12px;
+  display: none; align-items: center; gap: 10px;
+  animation: slideDown 0.4s ease;
+}
+.daily-banner.show { display: flex; }
+.daily-banner .banner-icon { font-size: 1.2rem; flex-shrink: 0; }
+.daily-banner .banner-text { flex: 1; font-size: 0.75rem; font-weight: 600; color: var(--accent2); }
+.daily-banner .banner-sub { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+
+/* ===== DASHBOARD CHARTS ===== */
+.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.chart-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius2); padding: 14px;
+}
+.chart-card .chart-title { font-size: 0.68rem; color: var(--muted); font-weight: 700; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+.bar-chart { display: flex; align-items: flex-end; gap: 4px; height: 70px; }
+.bar-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.bar-fill { width: 100%; border-radius: 4px 4px 0 0; transition: height 0.6s ease; min-height: 2px; }
+.bar-lbl { font-size: 0.48rem; color: var(--muted); text-align: center; }
+.donut-wrap { display: flex; align-items: center; gap: 10px; }
+.donut-legend { display: flex; flex-direction: column; gap: 5px; font-size: 0.6rem; }
+.donut-legend-item { display: flex; align-items: center; gap: 4px; }
+.donut-legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+/* ===== EDIT LOG ===== */
+.edit-log-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.78rem;
+}
+.edit-log-row:last-child { border-bottom: none; }
+.edit-log-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.7rem; }
+.edit-log-body { flex: 1; min-width: 0; }
+.edit-log-what { font-weight: 700; font-size: 0.78rem; }
+.edit-log-meta { font-size: 0.62rem; color: var(--muted); margin-top: 2px; }
+
+/* ===== AUTO LOCK ===== */
+#auto-lock-screen {
+  display: none; position: fixed; inset: 0; z-index: 9998;
+  background: rgba(0,0,0,0.96); backdrop-filter: blur(20px);
+  align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+}
+#auto-lock-screen.show { display: flex; }
+.lock-card {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 28px; padding: 32px 24px; max-width: 340px; width: 90%;
+  text-align: center; box-shadow: var(--glow);
+}
+.lock-icon { font-size: 2.5rem; margin-bottom: 12px; }
+.lock-card h3 { font-size: 1.1rem; font-weight: 800; margin-bottom: 6px; }
+.lock-card p { font-size: 0.75rem; color: var(--muted); margin-bottom: 20px; }
+
+/* ===== SMART SEARCH HIGHLIGHT ===== */
+.search-highlight { background: rgba(124,107,255,0.25); border-radius: 3px; padding: 0 2px; }
+
 /* ===== SECTION LABEL ===== */
 .section-label { font-size:0.68rem; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:0.08em; padding:0 2px; margin-bottom:8px; margin-top:4px; display:flex; align-items:center; gap:6px; }
 .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
@@ -830,6 +889,16 @@ input, textarea, select { font-size: 0.88rem !important; }
     <span class="close-alert" onclick="event.stopPropagation();document.getElementById('alert-banner').classList.remove('show')">x</span>
   </div>
 
+  <!-- DAILY REMINDER BANNER -->
+  <div class="daily-banner" id="daily-banner" onclick="showOverdueList()">
+    <div class="banner-icon">📋</div>
+    <div>
+      <div class="banner-text" id="daily-banner-text"></div>
+      <div class="banner-sub">اضغط لعرض قائمة مستحقات اليوم</div>
+    </div>
+    <span onclick="event.stopPropagation();document.getElementById('daily-banner').classList.remove('show')" style="color:var(--muted);cursor:pointer;padding:4px 8px;font-size:0.7rem">✕</span>
+  </div>
+
   <!-- STATS BAR (حساس - يظهر فقط للمدير) -->
   <div class="stats-bar" id="stats-bar">
     <div class="stat-pill" id="stat-remaining" onclick="if(currentUser.isAdmin) openM('report-modal')">
@@ -894,6 +963,8 @@ input, textarea, select { font-size: 0.88rem !important; }
     <button class="menu-btn" onclick="openCustomMsgs()"><i class="fa-solid fa-comment-dots" style="color:var(--green)"></i> رسائل مخصصة</button>
     <button class="menu-btn" id="menu-logs-btn" onclick="openLogs()"><i class="fa-solid fa-receipt" style="color:var(--blue)"></i> سجل العمليات</button>
     <button class="menu-btn" id="menu-activity-btn" onclick="openActivityLog()"><i class="fa-solid fa-shield-halved" style="color:var(--pink)"></i> سجل النشاط</button>
+    <button class="menu-btn" id="menu-editlog-btn" onclick="openEditLog()"><i class="fa-solid fa-pen-to-square" style="color:var(--orange)"></i> سجل التعديلات</button>
+    <button class="menu-btn" id="menu-dashboard-btn" onclick="openDashboard()"><i class="fa-solid fa-chart-bar" style="color:var(--accent2)"></i> لوحة التحليلات</button>
     <button class="menu-btn" onclick="showOverdueList()">
       <i class="fa-solid fa-clock-rotate-left" style="color:var(--red)"></i> قائمة المتأخرين
       <span id="overdue-badge" class="badge" style="background:rgba(248,113,113,0.15);color:var(--red)"></span>
@@ -1358,6 +1429,46 @@ input, textarea, select { font-size: 0.88rem !important; }
 </div> <!-- end dashboard-main -->
 </div> <!-- end app-main -->
 
+<!-- ===== AUTO LOCK SCREEN ===== -->
+<div id="auto-lock-screen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <h3>الشاشة مقفولة</h3>
+    <p>أدخل كلمة المرور للمتابعة</p>
+    <input type="password" id="lock-password" placeholder="كلمة المرور" style="margin-bottom:12px;text-align:center"
+      onkeydown="if(event.key==='Enter') unlockScreen()">
+    <button class="btn btn-green" onclick="unlockScreen()" style="width:100%">
+      <i class="fa-solid fa-unlock"></i> فتح القفل
+    </button>
+    <div id="lock-error" style="color:var(--red);font-size:0.75rem;margin-top:10px;min-height:18px"></div>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD CHARTS MODAL ===== -->
+<div class="modal-overlay" id="dashboard-modal">
+  <div class="modal-panel">
+    <div class="back-btn" onclick="closeM('dashboard-modal')">رجوع</div>
+    <div class="modal-title">📊 لوحة التحليلات</div>
+    <div id="dashboard-content"></div>
+  </div>
+</div>
+
+<!-- ===== EDIT LOG MODAL ===== -->
+<div class="modal-overlay" id="edit-log-modal">
+  <div class="modal-panel">
+    <div class="back-btn" onclick="closeToMenu('edit-log-modal')">رجوع</div>
+    <div class="modal-title">✏️ سجل التعديلات</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+      <input type="text" id="edit-log-search" placeholder="بحث..." oninput="renderEditLog()" style="flex:1;min-height:36px;font-size:0.8rem">
+      <div id="edit-log-count" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;font-size:0.75rem;font-weight:700;color:var(--orange);white-space:nowrap">0</div>
+    </div>
+    <div id="edit-log-list"></div>
+    <button onclick="clearEditLog()" style="margin-top:14px;width:100%;background:transparent;border:1px solid var(--red);color:var(--red);border-radius:var(--radius);padding:10px;font-family:'Cairo',sans-serif;font-size:0.8rem;cursor:pointer">
+      <i class="fa-solid fa-trash"></i> مسح السجل
+    </button>
+  </div>
+</div>
+
 <!-- ===== Firebase SDK ===== -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1741,6 +1852,8 @@ function applyPermissions() {
   document.getElementById('report-btn').style.display = (isAdmin || perms.canViewReport) ? 'flex' : 'none';
   document.getElementById('menu-logs-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('menu-activity-btn').style.display = isAdmin ? 'flex' : 'none';
+  document.getElementById('menu-editlog-btn').style.display = isAdmin ? 'flex' : 'none';
+  document.getElementById('menu-dashboard-btn').style.display = (isAdmin || perms.canViewReport) ? 'flex' : 'none';
   document.getElementById('menu-pdf-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('menu-trash-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('menu-staff-btn').style.display = isAdmin ? 'flex' : 'none';
@@ -2005,11 +2118,6 @@ function sortCustomers(arr) {
   return a;
 }
 
-function onSearch() {
-  const q = document.getElementById('search').value;
-  document.getElementById('search-clear').classList.toggle('show', q.length > 0);
-  render();
-}
 function clearSearch() {
   document.getElementById('search').value = '';
   document.getElementById('search-clear').classList.remove('show');
@@ -2206,7 +2314,7 @@ function render() {
     if(c.archived) return;
     totalMR += c.monthly;
     if(rem <= 0 && q === '' && !currentDayFilter) return;
-    if(q && !c.name.toLowerCase().includes(q) && !(c.prod||'').toLowerCase().includes(q)) return;
+    if(q && !matchesSearch(c, q)) return;
     if(currentDayFilter && c.dueDay !== currentDayFilter) return;
 
     shown++;
@@ -2306,6 +2414,7 @@ function saveCustomer() {
     earlyDiscount:0, payments:[], archived:false, date:new Date().toISOString().split('T')[0]
   };
   customers.push(c); save(); closeM('add-modal');
+  logEdit('إضافة عميل', c.name, `${fmt(c.total)} ج.م — ${c.prod||''}`);
   ['cust-name','cust-phone','prod-name','buy-price','sell-price','inst-total','down-payment','monthly-val','receive-date','months-count'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   render();
   showToast(`تم إضافة ${n} بنجاح`);
@@ -2334,6 +2443,7 @@ function updateCustomerInfo() {
   c.buy=parseFloat(document.getElementById('edit-buy-price').value)||0; c.sell=parseFloat(document.getElementById('edit-sell-price').value)||0;
   c.total=parseFloat(document.getElementById('edit-inst-total').value)||0; c.down=parseFloat(document.getElementById('edit-down-payment').value)||0;
   save(); closeM('edit-cust-modal'); openPaymentModal(activeCustomerId); render();
+  logEdit('تعديل عميل', c.name);
   showToast('تم حفظ التعديلات');
 }
 
@@ -2417,6 +2527,7 @@ function processEarlySettlement() {
   c.earlyDiscount = (c.earlyDiscount||0) + (rem-amt);
   c.lastActionDate = Date.now();
   save(); document.getElementById('settle-amount').value = '';
+  logEdit('سداد مبكر', c.name, `${fmt(amt)} ج.م`);
   closeM('settle-modal'); openPaymentModal(activeCustomerId); render();
   showToast('تمت التسوية بنجاح');
 }
@@ -2432,6 +2543,7 @@ function processPayment() {
   const d = new Date(document.getElementById('payment-date').value);
   c.payments.push({amount:amt, date:fmtDate(document.getElementById('payment-date').value), fullDate:d.toISOString(), note:document.getElementById('payment-note').value});
   c.lastActionDate = Date.now(); save();
+  logEdit('تسجيل قسط', c.name, `${fmt(amt)} ج.م`);
   document.getElementById('payment-amount').value = '';
   document.getElementById('payment-note').value = '';
   openPaymentModal(activeCustomerId); render();
@@ -2449,6 +2561,7 @@ function deletePayment(idx) {
     trashItems.push({ type:'payment', data: {...p, custId: c.id, custName: c.name}, deletedAt: Date.now() });
     c.payments.splice(idx, 1);
     saveTrash(); save(); openPaymentModal(activeCustomerId); render();
+    logEdit('حذف قسط', c.name, `${fmt(p.amount)} ج.م`);
     showToast('تم نقل الدفعة لسلة المهملات');
   }
 }
@@ -2472,6 +2585,7 @@ function deleteCust(id) {
     trashItems.push({ type:'customer', data: JSON.parse(JSON.stringify(c)), deletedAt: Date.now() });
     customers = customers.filter(c => c.id !== id);
     saveTrash(); save(); closeM('payment-modal'); render();
+    logEdit('حذف عميل', c.name);
     showToast('تم نقل العميل لسلة المهملات');
   }
 }
@@ -2484,7 +2598,9 @@ function archiveCustomer() {
   const c = customers.find(x => x.id === activeCustomerId); if(!c) return;
   const paid = c.payments.reduce((s,p) => s+p.amount, 0);
   if((c.total-c.down-(c.earlyDiscount||0))-paid > 0) { showToast('لا يمكن أرشفة عميل لم يسدد كامل المديونية!','error','fa-lock'); return; }
-  if(confirm('نقل العميل للأرشيف؟')) { c.archived=true; c.lastActionDate=Date.now(); save(); closeM('payment-modal'); render(); showToast('تم نقل العميل للأرشيف'); }
+  if(confirm('نقل العميل للأرشيف؟')) { c.archived=true; c.lastActionDate=Date.now(); save(); closeM('payment-modal'); render();
+    logEdit('أرشفة عميل', c.name);
+    showToast('تم نقل العميل للأرشيف'); }
 }
 
 function openArchive() {
@@ -2893,6 +3009,7 @@ function restoreItem(idx) {
   if(item.type === 'customer') {
     customers.push(item.data);
     save();
+    logEdit('استرجاع', item.data.name, 'من سلة المهملات');
     showToast('تم استرجاع العميل: ' + item.data.name);
   } else if(item.type === 'savings') {
     savingsAccounts.push(item.data);
@@ -2904,6 +3021,7 @@ function restoreItem(idx) {
       const {custId, custName, ...p} = item.data;
       c.payments.push(p);
       save();
+      logEdit('استرجاع', c.name, `دفعة ${fmt(p.amount)} ج.م`);
       showToast('تم استرجاع الدفعة');
     } else {
       showToast('العميل المرتبط بالدفعة غير موجود', 'error', 'fa-exclamation-circle');
@@ -2990,6 +3108,16 @@ function initApp() {
   const sorts = ['recent','due-high','name','monthly','remaining'];
   sortChips.forEach((c,i) => { if(sorts[i]) c.id = 'sort-' + sorts[i]; });
   render();
+
+  // ميزات جديدة
+  startAutoLock();
+  initKeyboardShortcuts();
+  setTimeout(checkDailyReminder, 800);
+
+  // تحميل سجل التعديلات من Firebase
+  if(window.fbLoad) window.fbLoad('edit_log', EDIT_LOG_KEY).then(data => {
+    if(data) localStorage.setItem(EDIT_LOG_KEY, JSON.stringify(data));
+  }).catch(()=>{});
 }
 
 // شاشة الـ login هتظهر بعد ما Firebase يخلص (أو auto-login لو في جلسة محفوظة)
@@ -3017,7 +3145,384 @@ if(window.firebaseReady && window._autoLogin) {
 }
 // لو Firebase لسه بيحمّل، هو هيتكفل يظهر الـ login أو يعمل auto-login
 
-// ===== ACTIVITY LOG =====
+// ===== SMART SEARCH (بحث ذكي — هاتف + منتج + مبلغ) =====
+function onSearch() {
+  const q = document.getElementById('search').value;
+  document.getElementById('search-clear').classList.toggle('show', q.length > 0);
+  render();
+}
+
+function matchesSearch(c, q) {
+  if(!q) return true;
+  const ql = q.toLowerCase();
+  const paid = c.payments.reduce((s,p) => s+p.amount, 0);
+  return (c.name||'').toLowerCase().includes(ql) ||
+         (c.prod||'').toLowerCase().includes(ql) ||
+         (c.phone||'').replace(/\D/g,'').includes(ql.replace(/\D/g,'')) ||
+         String(c.monthly||'').includes(ql) ||
+         String(c.total||'').includes(ql) ||
+         String(paid).includes(ql);
+}
+
+// ===== AUTO LOCK (قفل تلقائي بعد ١٠ دقايق) =====
+const LOCK_TIMEOUT = 10 * 60 * 1000; // 10 دقايق
+let _lockTimer = null;
+let _lockEnabled = false;
+
+function resetLockTimer() {
+  if(!_lockEnabled) return;
+  clearTimeout(_lockTimer);
+  _lockTimer = setTimeout(activateLock, LOCK_TIMEOUT);
+}
+
+function activateLock() {
+  if(!window.appInitialized || !currentUser.username || currentUser.isCustomer) return;
+  const lockEl = document.getElementById('auto-lock-screen');
+  lockEl.classList.add('show');
+  document.getElementById('lock-password').value = '';
+  document.getElementById('lock-error').textContent = '';
+  setTimeout(() => document.getElementById('lock-password').focus(), 100);
+}
+
+function unlockScreen() {
+  const pass = document.getElementById('lock-password').value;
+  const errEl = document.getElementById('lock-error');
+  let valid = false;
+  if(currentUser.isAdmin) {
+    valid = (pass === USER_CREDENTIALS.password);
+  } else {
+    const staff = staffMembers.find(s => s.id === currentUser.staffId);
+    valid = staff && (pass === staff.password);
+  }
+  if(valid) {
+    document.getElementById('auto-lock-screen').classList.remove('show');
+    resetLockTimer();
+  } else {
+    errEl.textContent = '❌ كلمة المرور غير صحيحة';
+    document.getElementById('lock-password').value = '';
+    document.getElementById('lock-password').focus();
+  }
+}
+
+function startAutoLock() {
+  _lockEnabled = true;
+  ['click','keydown','touchstart','scroll'].forEach(ev =>
+    document.addEventListener(ev, resetLockTimer, { passive: true })
+  );
+  resetLockTimer();
+}
+
+// ===== DAILY REMINDER (تذكير يومي بمستحقات اليوم) =====
+function checkDailyReminder() {
+  const today = new Date().getDate();
+  const REMINDER_KEY = 'opera_daily_reminder_' + new Date().toDateString();
+  if(localStorage.getItem(REMINDER_KEY)) return; // عرضناه النهارده
+
+  const todayCustomers = customers.filter(c => {
+    if(c.archived) return false;
+    const paid = c.payments.reduce((s,p) => s+p.amount, 0);
+    const rem = (c.total-c.down-(c.earlyDiscount||0)) - paid;
+    return rem > 0 && c.dueDay === today;
+  });
+
+  const overdueCustomers = customers.filter(c => {
+    if(c.archived) return false;
+    return calculateDueAmount(c) > 0;
+  });
+
+  const banner = document.getElementById('daily-banner');
+  const bannerText = document.getElementById('daily-banner-text');
+
+  if(todayCustomers.length > 0 || overdueCustomers.length > 0) {
+    let msg = '';
+    if(todayCustomers.length > 0) msg += `📅 ${todayCustomers.length} عميل موعد قسطه اليوم`;
+    if(todayCustomers.length > 0 && overdueCustomers.length > 0) msg += ' · ';
+    if(overdueCustomers.length > 0) msg += `⚠️ ${overdueCustomers.length} عميل متأخر`;
+    bannerText.textContent = msg;
+    banner.classList.add('show');
+    localStorage.setItem(REMINDER_KEY, '1');
+  }
+}
+
+// ===== EDIT LOG (سجل التعديلات) =====
+const EDIT_LOG_KEY = 'opera_edit_log';
+
+function logEdit(action, custName, details = '') {
+  try {
+    const logs = JSON.parse(localStorage.getItem(EDIT_LOG_KEY) || '[]');
+    logs.unshift({
+      action,
+      custName,
+      details,
+      by: currentUser.isAdmin ? 'مدير' : (currentUser.staffName || currentUser.username),
+      time: new Date().toLocaleString('ar-EG', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}),
+      ts: Date.now()
+    });
+    if(logs.length > 300) logs.splice(300);
+    localStorage.setItem(EDIT_LOG_KEY, JSON.stringify(logs));
+    if(window.fbSave) window.fbSave('edit_log', logs);
+  } catch(e) {}
+}
+
+function openEditLog() {
+  if(!currentUser.isAdmin) { showToast('المدير فقط', 'error', 'fa-lock'); return; }
+  closeM('menu-modal');
+  document.getElementById('edit-log-search').value = '';
+  // جلب أحدث بيانات من Firebase
+  if(window.fbLoad) {
+    window.fbLoad('edit_log', EDIT_LOG_KEY).then(data => {
+      if(data) localStorage.setItem(EDIT_LOG_KEY, JSON.stringify(data));
+      renderEditLog();
+    }).catch(() => renderEditLog());
+  } else {
+    renderEditLog();
+  }
+  openM('edit-log-modal');
+}
+
+function renderEditLog() {
+  const q = (document.getElementById('edit-log-search').value || '').toLowerCase();
+  let logs = [];
+  try { logs = JSON.parse(localStorage.getItem(EDIT_LOG_KEY) || '[]'); } catch(e) {}
+  const filtered = q ? logs.filter(l =>
+    (l.custName||'').toLowerCase().includes(q) ||
+    (l.action||'').toLowerCase().includes(q) ||
+    (l.by||'').toLowerCase().includes(q) ||
+    (l.details||'').toLowerCase().includes(q)
+  ) : logs;
+
+  document.getElementById('edit-log-count').textContent = filtered.length + ' تعديل';
+
+  const actionConfig = {
+    'إضافة عميل':    { icon: 'fa-user-plus',    color: 'var(--green)',   bg: 'rgba(52,211,153,0.1)' },
+    'تعديل عميل':    { icon: 'fa-pen',           color: 'var(--blue)',    bg: 'rgba(96,165,250,0.1)' },
+    'حذف عميل':      { icon: 'fa-user-minus',    color: 'var(--red)',     bg: 'rgba(248,113,113,0.1)' },
+    'تسجيل قسط':     { icon: 'fa-money-bill',    color: 'var(--accent2)', bg: 'rgba(167,139,250,0.1)' },
+    'حذف قسط':       { icon: 'fa-trash',         color: 'var(--red)',     bg: 'rgba(248,113,113,0.1)' },
+    'سداد مبكر':     { icon: 'fa-handshake',     color: 'var(--orange)',  bg: 'rgba(251,146,60,0.1)' },
+    'أرشفة عميل':    { icon: 'fa-box-archive',   color: 'var(--muted)',   bg: 'rgba(107,107,138,0.1)' },
+    'استرجاع':       { icon: 'fa-rotate-right',  color: 'var(--green)',   bg: 'rgba(52,211,153,0.1)' },
+  };
+
+  if(!filtered.length) {
+    document.getElementById('edit-log-list').innerHTML = '<div class="empty"><i class="fa-solid fa-pen-to-square"></i><p>لا توجد تعديلات مسجلة</p></div>';
+    return;
+  }
+
+  document.getElementById('edit-log-list').innerHTML = filtered.map(l => {
+    const cfg = actionConfig[l.action] || { icon: 'fa-circle-dot', color: 'var(--muted)', bg: 'transparent' };
+    return `<div class="edit-log-row">
+      <div class="edit-log-icon" style="background:${cfg.bg};border:1px solid ${cfg.color}30">
+        <i class="fa-solid ${cfg.icon}" style="color:${cfg.color}"></i>
+      </div>
+      <div class="edit-log-body">
+        <div class="edit-log-what">${l.action} — <span style="color:var(--accent2)">${l.custName||'--'}</span></div>
+        <div class="edit-log-meta">${l.details ? l.details + ' · ' : ''}بواسطة: ${l.by} · ${l.time}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function clearEditLog() {
+  if(!currentUser.isAdmin) return;
+  if(confirm('مسح كل سجل التعديلات؟')) {
+    localStorage.setItem(EDIT_LOG_KEY, '[]');
+    if(window.fbSave) window.fbSave('edit_log', []);
+    renderEditLog();
+    showToast('تم مسح السجل');
+  }
+}
+
+// ===== DASHBOARD CHARTS (لوحة التحليلات) =====
+function openDashboard() {
+  if(!currentUser.isAdmin && !hasPermission('canViewReport')) {
+    showToast('غير مصرح', 'error', 'fa-lock'); return;
+  }
+  closeM('menu-modal');
+  buildDashboard();
+  openM('dashboard-modal');
+}
+
+function buildDashboard() {
+  const container = document.getElementById('dashboard-content');
+
+  // حساب البيانات
+  const months = ['يناير','فبراير','مارس','إبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const now = new Date();
+  const monthlyCollection = Array(6).fill(0);
+  const monthLabels = [];
+  for(let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    monthLabels.push(months[d.getMonth()].slice(0,3));
+    customers.forEach(c => {
+      c.payments.forEach(p => {
+        const pd = new Date(p.fullDate || p.date);
+        if(pd.getFullYear() === d.getFullYear() && pd.getMonth() === d.getMonth()) {
+          monthlyCollection[5-i] += p.amount;
+        }
+      });
+    });
+  }
+  const maxCol = Math.max(...monthlyCollection, 1);
+
+  // توزيع العملاء حسب الحالة
+  let countOk=0, countWarn=0, countBad=0, countDone=0;
+  customers.forEach(c => {
+    if(c.archived) return;
+    const s = getCardStatus(c);
+    if(s==='ok') countOk++; else if(s==='warn') countWarn++;
+    else if(s==='bad') countBad++; else countDone++;
+  });
+  const totalC = countOk+countWarn+countBad+countDone || 1;
+
+  // أعلى المنتجات
+  const prodMap = {};
+  customers.forEach(c => {
+    const n = (c.prod||'غير محدد').trim();
+    if(!prodMap[n]) prodMap[n] = 0;
+    prodMap[n]++;
+  });
+  const topProds = Object.entries(prodMap).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const maxProd = Math.max(...topProds.map(p=>p[1]), 1);
+
+  // توقع الشهر القادم
+  const thisMonthPaid = monthlyCollection[5];
+  const lastMonthPaid = monthlyCollection[4];
+  const nextMonthExpected = customers.reduce((s,c) => {
+    const paid = c.payments.reduce((a,p) => a+p.amount, 0);
+    const rem = (c.total-c.down-(c.earlyDiscount||0)) - paid;
+    return s + (rem > 0 && !c.archived ? c.monthly : 0);
+  }, 0);
+  const growthPct = lastMonthPaid > 0 ? Math.round(((thisMonthPaid - lastMonthPaid) / lastMonthPaid) * 100) : 0;
+
+  // بناء HTML
+  container.innerHTML = `
+    <!-- كروت ملخص -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center">
+        <div style="font-size:0.6rem;color:var(--muted);margin-bottom:4px">المحصل هذا الشهر</div>
+        <div style="font-size:1rem;font-weight:800;color:var(--green)">${fmt(thisMonthPaid)}</div>
+        <div style="font-size:0.6rem;margin-top:3px;color:${growthPct>=0?'var(--green)':'var(--red)'}">
+          ${growthPct >= 0 ? '▲' : '▼'} ${Math.abs(growthPct)}% عن الشهر السابق
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center">
+        <div style="font-size:0.6rem;color:var(--muted);margin-bottom:4px">متوقع الشهر القادم</div>
+        <div style="font-size:1rem;font-weight:800;color:var(--accent2)">${fmt(nextMonthExpected)}</div>
+        <div style="font-size:0.6rem;color:var(--muted);margin-top:3px">بناءً على الأقساط الشهرية</div>
+      </div>
+    </div>
+
+    <!-- رسم التحصيل الشهري -->
+    <div class="chart-card" style="margin-bottom:12px">
+      <div class="chart-title">📈 التحصيل الشهري (آخر ٦ أشهر)</div>
+      <div class="bar-chart">
+        ${monthlyCollection.map((v, i) => `
+          <div class="bar-item">
+            <div style="font-size:0.5rem;color:var(--muted);margin-bottom:2px">${fmt(v/1000).replace(',','.')}k</div>
+            <div class="bar-fill" style="height:${Math.round((v/maxCol)*60)+4}px;background:${i===5?'var(--accent)':'rgba(124,107,255,0.3)'}"></div>
+            <div class="bar-lbl">${monthLabels[i]}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- توزيع العملاء -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">👥 توزيع العملاء</div>
+        <div class="donut-wrap">
+          <svg width="64" height="64" viewBox="0 0 64 64">
+            ${buildDonut([
+              {v:countOk, c:'#34d399'}, {v:countWarn, c:'#fb923c'},
+              {v:countBad, c:'#f87171'}, {v:countDone, c:'#6b6b8a'}
+            ])}
+          </svg>
+          <div class="donut-legend">
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#34d399"></div><span>منتظم (${countOk})</span></div>
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#fb923c"></div><span>تأخير (${countWarn})</span></div>
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#f87171"></div><span>متأخر (${countBad})</span></div>
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#6b6b8a"></div><span>منتهي (${countDone})</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- مقارنة الشهرين -->
+      <div class="chart-card">
+        <div class="chart-title">📊 مقارنة الأشهر</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          ${monthlyCollection.slice(3).map((v,i) => `
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:0.58rem;color:var(--muted);margin-bottom:2px">
+                <span>${monthLabels[i+3]}</span><span>${fmt(v)}</span>
+              </div>
+              <div style="height:6px;background:var(--surface3);border-radius:4px;overflow:hidden">
+                <div style="height:100%;width:${Math.round((v/maxCol)*100)}%;background:${i===2?'var(--accent)':'rgba(124,107,255,0.4)'};border-radius:4px;transition:width 0.6s ease"></div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- أعلى المنتجات -->
+    <div class="chart-card">
+      <div class="chart-title">🏆 أعلى المنتجات مبيعاً</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+        ${topProds.map(([name, count], i) => `
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:0.72rem;margin-bottom:3px">
+              <span style="font-weight:700;color:${i===0?'var(--accent2)':'var(--text)'}">${i===0?'🥇 ':''}${name}</span>
+              <span style="color:var(--muted)">${count} عميل</span>
+            </div>
+            <div style="height:6px;background:var(--surface3);border-radius:4px;overflow:hidden">
+              <div style="height:100%;width:${Math.round((count/maxProd)*100)}%;background:${['var(--accent)','var(--accent2)','var(--blue)','var(--green)','var(--orange)'][i]||'var(--muted)'};border-radius:4px;transition:width 0.6s ease"></div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function buildDonut(segments) {
+  const total = segments.reduce((s,x) => s+x.v, 0) || 1;
+  const r = 24, cx = 32, cy = 32, stroke = 10;
+  const circumference = 2 * Math.PI * r;
+  let offset = 0;
+  return segments.map(({v, c}) => {
+    const dash = (v / total) * circumference;
+    const gap = circumference - dash;
+    const el = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-width="${stroke}"
+      stroke-dasharray="${dash} ${gap}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += dash;
+    return el;
+  }).join('');
+}
+
+// ===== KEYBOARD SHORTCUTS (اختصارات لوحة المفاتيح) =====
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', e => {
+    // تجاهل لو في input
+    if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+    // تجاهل لو القفل مفعّل
+    if(document.getElementById('auto-lock-screen').classList.contains('show')) return;
+    if(!window.appInitialized || currentUser.isCustomer) return;
+
+    if(e.ctrlKey || e.metaKey) {
+      switch(e.key) {
+        case 'n': e.preventDefault(); if(currentUser.isAdmin || hasPermission('canAdd')) openM('add-modal'); break;
+        case 'f': e.preventDefault(); document.getElementById('search').focus(); break;
+        case 'r': e.preventDefault(); if(currentUser.isAdmin) openM('report-modal'); break;
+        case 'd': e.preventDefault(); openDashboard(); break;
+      }
+    }
+    if(e.key === 'Escape') {
+      // إغلاق أول مودال مفتوح
+      const open = document.querySelector('.modal-overlay.open');
+      if(open) closeM(open.id);
+    }
+  });
+}
+
+// ===== KEYBOARD SHORTCUTS ===== 
 const ACTIVITY_KEY = 'opera_activity_log';
 const MAX_LOGS = 500;
 
@@ -3316,6 +3821,11 @@ window.openCustomerPortal = openCustomerPortal;
 window.openActivityLog = openActivityLog;
 window.renderActivityLog = renderActivityLog;
 window.clearActivityLog = clearActivityLog;
+window.openEditLog = openEditLog;
+window.renderEditLog = renderEditLog;
+window.clearEditLog = clearEditLog;
+window.openDashboard = openDashboard;
+window.unlockScreen = unlockScreen;
 </script>
 </body>
 </html>
