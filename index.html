@@ -566,6 +566,16 @@ select option { background:var(--surface2); }
 .empty i { font-size:2.5rem; margin-bottom:12px; display:block; opacity:0.3; }
 .empty p { font-size:0.85rem; }
 
+/* ===== BROADCAST ===== */
+.bc-type-btn {
+  background: var(--surface2); border: 2px solid var(--border);
+  color: var(--muted); border-radius: var(--radius); padding: 10px 6px;
+  font-family: 'Cairo', sans-serif; font-size: 0.72rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; text-align: center; line-height: 1.6;
+}
+.bc-type-btn i { font-size: 1.1rem; display: block; margin-bottom: 3px; }
+.bc-type-btn.active { border-color: var(--accent); background: rgba(124,107,255,0.12); color: var(--accent2); }
+
 /* ===== DAILY REMINDER BANNER ===== */
 .daily-banner {
   background: linear-gradient(135deg, rgba(124,107,255,0.12), rgba(167,139,250,0.06));
@@ -754,6 +764,12 @@ input, textarea, select { font-size: 0.88rem !important; }
       <div id="portal-status-badge" class="portal-status-badge"></div>
     </div>
 
+    <!-- تنبيه كلمة المرور الافتراضية -->
+    <div id="portal-default-pass-warning" style="display:none;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;font-size:0.75rem;color:var(--orange);line-height:1.6;text-align:center">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      كلمة مرورك الحالية هي <strong>0000</strong> — يُنصح بتغييرها من زر "تغيير كلمة المرور" أسفل الصفحة
+    </div>
+
     <!-- رسالة من المتجر -->
     <div id="portal-msg-container" style="display:none" class="portal-msg-box">
       <div class="msg-label"><i class="fa-solid fa-bell"></i> رسالة من المتجر</div>
@@ -840,6 +856,9 @@ input, textarea, select { font-size: 0.88rem !important; }
 
     <button class="portal-logout-btn" onclick="portalLogout()">
       <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
+    </button>
+    <button class="portal-logout-btn" onclick="openPortalChangePassword()" style="margin-top:8px;border-color:var(--accent);color:var(--accent2)">
+      <i class="fa-solid fa-key"></i> تغيير كلمة المرور
     </button>
   </div>
 </div>
@@ -961,6 +980,7 @@ input, textarea, select { font-size: 0.88rem !important; }
     <button class="menu-btn" onclick="openArchive()"><i class="fa-solid fa-box-archive" style="color:var(--accent2)"></i> الأرشيف</button>
     <button class="menu-btn" onclick="openOffers()"><i class="fa-solid fa-bullhorn" style="color:var(--orange)"></i> العروض والترويج</button>
     <button class="menu-btn" onclick="openCustomMsgs()"><i class="fa-solid fa-comment-dots" style="color:var(--green)"></i> رسائل مخصصة</button>
+    <button class="menu-btn" id="menu-broadcast-btn" onclick="openBroadcast()"><i class="fa-solid fa-tower-broadcast" style="color:var(--pink)"></i> إشعار لكل العملاء</button>
     <button class="menu-btn" id="menu-logs-btn" onclick="openLogs()"><i class="fa-solid fa-receipt" style="color:var(--blue)"></i> سجل العمليات</button>
     <button class="menu-btn" id="menu-activity-btn" onclick="openActivityLog()"><i class="fa-solid fa-shield-halved" style="color:var(--pink)"></i> سجل النشاط</button>
     <button class="menu-btn" id="menu-editlog-btn" onclick="openEditLog()"><i class="fa-solid fa-pen-to-square" style="color:var(--orange)"></i> سجل التعديلات</button>
@@ -1429,6 +1449,56 @@ input, textarea, select { font-size: 0.88rem !important; }
 </div> <!-- end dashboard-main -->
 </div> <!-- end app-main -->
 
+<!-- ===== BROADCAST NOTIFICATION MODAL ===== -->
+<div class="modal-overlay" id="broadcast-modal">
+  <div class="modal-panel">
+    <div class="back-btn" onclick="closeToMenu('broadcast-modal')">رجوع</div>
+    <div class="modal-title">📢 إشعار لكل العملاء</div>
+
+    <div style="background:rgba(124,107,255,0.08);border:1px solid rgba(124,107,255,0.2);border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:0.72rem;color:var(--muted);line-height:1.7">
+      الرسالة ستظهر لكل العملاء في بوابتهم فور فتحها.<br>
+      يمكنك إرسالها على واتساب لكل العملاء النشطين أيضاً.
+    </div>
+
+    <!-- نوع الإشعار -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      <button id="bc-type-info" class="bc-type-btn active" onclick="selectBcType('info')">
+        <i class="fa-solid fa-circle-info"></i><br><span>معلومة</span>
+      </button>
+      <button id="bc-type-offer" class="bc-type-btn" onclick="selectBcType('offer')">
+        <i class="fa-solid fa-tag"></i><br><span>عرض</span>
+      </button>
+      <button id="bc-type-warn" class="bc-type-btn" onclick="selectBcType('warn')">
+        <i class="fa-solid fa-triangle-exclamation"></i><br><span>تنبيه</span>
+      </button>
+    </div>
+
+    <div class="field">
+      <label>عنوان الإشعار</label>
+      <input type="text" id="bc-title" placeholder="مثال: عرض خاص لعملاء أوبرا ستور">
+    </div>
+    <div class="field">
+      <label>نص الرسالة</label>
+      <textarea id="bc-body" placeholder="اكتب نص الإشعار هنا..." style="height:100px;resize:none"></textarea>
+    </div>
+
+    <!-- خيارات الإرسال -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <button class="btn btn-green" onclick="sendBroadcastToPortal()">
+        <i class="fa-solid fa-bell"></i> نشر في البوابة
+      </button>
+      <button class="btn" style="background:var(--green);color:#0a2018" onclick="sendBroadcastWhatsApp()">
+        <i class="fa-brands fa-whatsapp"></i> إرسال واتساب
+      </button>
+    </div>
+    <button class="btn" style="background:transparent;border:1px solid var(--red);color:var(--red);width:100%" onclick="clearBroadcast()">
+      <i class="fa-solid fa-xmark"></i> مسح الإشعار الحالي من البوابة
+    </button>
+
+    <div id="bc-status" style="text-align:center;margin-top:12px;font-size:0.75rem;color:var(--muted)"></div>
+  </div>
+</div>
+
 <!-- ===== AUTO LOCK SCREEN ===== -->
 <div id="auto-lock-screen">
   <div class="lock-card">
@@ -1441,6 +1511,30 @@ input, textarea, select { font-size: 0.88rem !important; }
       <i class="fa-solid fa-unlock"></i> فتح القفل
     </button>
     <div id="lock-error" style="color:var(--red);font-size:0.75rem;margin-top:10px;min-height:18px"></div>
+  </div>
+</div>
+
+<!-- ===== PORTAL CHANGE PASSWORD MODAL (للعميل) ===== -->
+<div class="modal-overlay" id="portal-change-pass-modal">
+  <div class="modal-panel" style="max-width:380px;height:auto;border-radius:24px">
+    <div class="back-btn" onclick="closeM('portal-change-pass-modal')">إلغاء</div>
+    <div class="modal-title">🔑 تغيير كلمة المرور</div>
+    <div class="field">
+      <label>كلمة المرور الحالية</label>
+      <input type="password" id="portal-old-pass" placeholder="****">
+    </div>
+    <div class="field">
+      <label>كلمة المرور الجديدة</label>
+      <input type="password" id="portal-new-pass" placeholder="****">
+    </div>
+    <div class="field">
+      <label>تأكيد كلمة المرور الجديدة</label>
+      <input type="password" id="portal-confirm-pass" placeholder="****">
+    </div>
+    <div id="portal-pass-error" style="color:var(--red);font-size:0.78rem;text-align:center;margin-bottom:10px;min-height:18px"></div>
+    <button class="btn btn-green" onclick="savePortalChangePassword()" style="width:100%">
+      <i class="fa-solid fa-check"></i> حفظ كلمة المرور
+    </button>
   </div>
 </div>
 
@@ -1755,7 +1849,9 @@ function attemptLogin() {
     });
     if(!cust) { err.textContent = '❌ رقم الهاتف غير مسجل'; logActivity('customer_fail', {phone: u, reason: 'رقم غير مسجل'}); return; }
     if(!cust.portalPassword) { err.textContent = '❌ البوابة غير مفعّلة لهذا الحساب — تواصل مع المتجر'; return; }
-    if(p !== cust.portalPassword) { err.textContent = '❌ كلمة المرور غير صحيحة'; logActivity('customer_fail', {phone: u, name: cust.name, reason: 'كلمة مرور خاطئة'}); return; }
+    // لو العميل غيّر كلمة المرور، 0000 ما تشتغلش
+    const validCustPass = cust.portalPasswordChanged ? (p === cust.portalPassword) : (p === '0000' || p === cust.portalPassword);
+    if(!validCustPass) { err.textContent = '❌ كلمة المرور غير صحيحة'; logActivity('customer_fail', {phone: u, name: cust.name, reason: 'كلمة مرور خاطئة'}); return; }
     // دخول ناجح
     logActivity('customer_login', {name: cust.name, phone: cust.phone, custId: cust.id});
     currentUser = { username: phone, isAdmin: false, isCustomer: true, customerId: cust.id, customerName: cust.name };
@@ -2411,7 +2507,10 @@ function saveCustomer() {
     total:parseFloat(it)||0,
     down:parseFloat(document.getElementById('down-payment').value)||0,
     monthly:parseFloat(document.getElementById('monthly-val').value)||0,
-    earlyDiscount:0, payments:[], archived:false, date:new Date().toISOString().split('T')[0]
+    earlyDiscount:0, payments:[], archived:false,
+    date:new Date().toISOString().split('T')[0],
+    portalPassword: '0000', // تفعيل تلقائي برقم 0000
+    portalPasswordChanged: false
   };
   customers.push(c); save(); closeM('add-modal');
   logEdit('إضافة عميل', c.name, `${fmt(c.total)} ج.م — ${c.prod||''}`);
@@ -3654,6 +3753,119 @@ function clearActivityLog() {
   }
 }
 
+// ===== BROADCAST NOTIFICATION =====
+let _bcType = 'info';
+
+function openBroadcast() {
+  if(!currentUser.isAdmin) { showToast('المدير فقط', 'error', 'fa-lock'); return; }
+  closeM('menu-modal');
+  // اعرض الإشعار الحالي لو في واحد
+  const existing = customers.find(c => c.broadcastMsg);
+  const statusEl = document.getElementById('bc-status');
+  if(existing) {
+    statusEl.textContent = `📢 يوجد إشعار نشط حالياً: "${existing.broadcastMsg.title}"`;
+  } else {
+    statusEl.textContent = '';
+  }
+  document.getElementById('bc-title').value = '';
+  document.getElementById('bc-body').value = '';
+  selectBcType('info');
+  openM('broadcast-modal');
+}
+
+function selectBcType(type) {
+  _bcType = type;
+  ['info','offer','warn'].forEach(t => {
+    document.getElementById('bc-type-' + t).classList.toggle('active', t === type);
+  });
+}
+
+function sendBroadcastToPortal() {
+  const title = document.getElementById('bc-title').value.trim();
+  const body = document.getElementById('bc-body').value.trim();
+  if(!title || !body) { showToast('أدخل العنوان والرسالة', 'error', 'fa-exclamation-circle'); return; }
+
+  const bcData = {
+    title, body, type: _bcType,
+    sentAt: new Date().toLocaleString('ar-EG', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}),
+    sentBy: currentUser.isAdmin ? 'مدير' : currentUser.staffName
+  };
+
+  // حفظ الإشعار على كل العملاء
+  let count = 0;
+  customers.forEach(c => {
+    if(!c.archived) { c.broadcastMsg = bcData; count++; }
+  });
+  save();
+  document.getElementById('bc-status').textContent = `✅ تم نشر الإشعار لـ ${count} عميل`;
+  showToast(`تم نشر الإشعار لـ ${count} عميل`, 'success', 'fa-bell');
+  logEdit('إشعار جماعي', 'كل العملاء', title);
+}
+
+function sendBroadcastWhatsApp() {
+  const title = document.getElementById('bc-title').value.trim();
+  const body = document.getElementById('bc-body').value.trim();
+  if(!title || !body) { showToast('أدخل العنوان والرسالة', 'error', 'fa-exclamation-circle'); return; }
+
+  const activeCustomers = customers.filter(c => {
+    if(c.archived) return false;
+    const paid = c.payments.reduce((s,p) => s+p.amount, 0);
+    return (c.total - c.down - (c.earlyDiscount||0)) - paid > 0;
+  });
+
+  if(!activeCustomers.length) { showToast('لا يوجد عملاء نشطين', 'error', 'fa-exclamation-circle'); return; }
+
+  // فتح واتساب لأول عميل — الباقين يحتاجون إرسال يدوي
+  // نفتح واتساب لكل عميل بشكل متتالي (كل ٨٠٠ms)
+  showToast(`سيتم فتح واتساب لـ ${activeCustomers.length} عميل`, 'success', 'fa-whatsapp');
+  activeCustomers.forEach((c, i) => {
+    setTimeout(() => {
+      const msg = `*${title}*%0A%0A${body}%0A%0AOPERA STORE`;
+      window.open(`https://wa.me/2${c.phone}?text=${msg}`, '_blank');
+    }, i * 800);
+  });
+}
+
+function clearBroadcast() {
+  if(!confirm('مسح الإشعار الحالي من بوابة كل العملاء؟')) return;
+  customers.forEach(c => { delete c.broadcastMsg; });
+  save();
+  document.getElementById('bc-status').textContent = '🔴 تم مسح الإشعار من كل البوابات';
+  showToast('تم مسح الإشعار', 'success', 'fa-check');
+}
+
+// ===== PORTAL CHANGE PASSWORD (للعميل) =====
+function openPortalChangePassword() {
+  document.getElementById('portal-old-pass').value = '';
+  document.getElementById('portal-new-pass').value = '';
+  document.getElementById('portal-confirm-pass').value = '';
+  document.getElementById('portal-pass-error').textContent = '';
+  openM('portal-change-pass-modal');
+}
+
+function savePortalChangePassword() {
+  const oldPass = document.getElementById('portal-old-pass').value;
+  const newPass = document.getElementById('portal-new-pass').value;
+  const confirmPass = document.getElementById('portal-confirm-pass').value;
+  const errEl = document.getElementById('portal-pass-error');
+
+  const c = customers.find(x => x.id === window._portalCustomerId);
+  if(!c) return;
+
+  // التحقق من كلمة المرور الحالية
+  const validOld = c.portalPasswordChanged ? (oldPass === c.portalPassword) : (oldPass === '0000' || oldPass === c.portalPassword);
+  if(!validOld) { errEl.textContent = '❌ كلمة المرور الحالية غير صحيحة'; return; }
+  if(newPass.length < 4) { errEl.textContent = '❌ كلمة المرور الجديدة قصيرة جداً (4 أرقام على الأقل)'; return; }
+  if(newPass !== confirmPass) { errEl.textContent = '❌ كلمة المرور الجديدة غير متطابقة'; return; }
+  if(newPass === '0000') { errEl.textContent = '❌ لا يمكن استخدام 0000 ككلمة مرور'; return; }
+
+  c.portalPassword = newPass;
+  c.portalPasswordChanged = true;
+  save();
+  closeM('portal-change-pass-modal');
+  showToast('تم تغيير كلمة المرور بنجاح ✅', 'success', 'fa-check');
+}
+
 // ===== CUSTOMER PORTAL FUNCTIONS =====
 function openCustomerPortal(custId) {
   const c = customers.find(x => x.id === custId);
@@ -3671,14 +3883,27 @@ function openCustomerPortal(custId) {
   const [sl, sbg, sc] = statusMap[status] || statusMap.ok;
   const progColor = status==='bad'?'var(--red)':status==='warn'?'var(--orange)':status==='done'?'var(--muted)':'var(--green)';
 
-  // رسالة من المتجر
+  // رسالة من المتجر (شخصية أو جماعية)
   const msgContainer = document.getElementById('portal-msg-container');
   const msgText = document.getElementById('portal-msg-text');
-  if(c.portalMessage) {
+  const displayMsg = c.broadcastMsg || (c.portalMessage ? {title: '📩 رسالة من المتجر', body: c.portalMessage} : null);
+  if(displayMsg) {
     msgContainer.style.display = 'block';
-    msgText.textContent = c.portalMessage;
+    const typeIcon = displayMsg.type === 'offer' ? '🏷️' : displayMsg.type === 'warn' ? '⚠️' : '📢';
+    msgText.innerHTML = `<strong>${typeIcon} ${displayMsg.title || ''}</strong><br><span style="font-size:0.82rem">${displayMsg.body || displayMsg}</span>` +
+      (displayMsg.sentAt ? `<br><span style="font-size:0.6rem;color:var(--muted)">${displayMsg.sentAt}</span>` : '');
   } else {
     msgContainer.style.display = 'none';
+  }
+
+  // تنبيه لو كلمة المرور لسه 0000
+  const warningEl = document.getElementById('portal-default-pass-warning');
+  if(warningEl) {
+    if(!c.portalPasswordChanged) {
+      warningEl.style.display = 'block';
+    } else {
+      warningEl.style.display = 'none';
+    }
   }
 
   // بيانات العقد
@@ -3837,6 +4062,13 @@ window.renderEditLog = renderEditLog;
 window.clearEditLog = clearEditLog;
 window.openDashboard = openDashboard;
 window.unlockScreen = unlockScreen;
+window.openBroadcast = openBroadcast;
+window.selectBcType = selectBcType;
+window.sendBroadcastToPortal = sendBroadcastToPortal;
+window.sendBroadcastWhatsApp = sendBroadcastWhatsApp;
+window.clearBroadcast = clearBroadcast;
+window.openPortalChangePassword = openPortalChangePassword;
+window.savePortalChangePassword = savePortalChangePassword;
 </script>
 </body>
 </html>
