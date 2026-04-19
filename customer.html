@@ -8,6 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- OneSignal Push Notifications SDK -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+</script>
 <style>
 :root {
   --bg: #000000;
@@ -355,7 +360,6 @@ input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,107,25
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCUi3kogTKbON6HyKNXmIrgtyAVoI9h0t0",
@@ -368,55 +372,56 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-let messaging = null;
 
-// ===== VAPID KEY — اشتراك الإشعارات =====
-// ⚠️ ضع هنا الـ VAPID Key الخاص بك من Firebase Console
-// Firebase Console → Project Settings → Cloud Messaging → Web Push certificates → Generate key pair
-const VAPID_KEY = 'YOUR_VAPID_KEY_HERE';
+// ===== OneSignal Setup =====
+const ONESIGNAL_APP_ID = 'd64ddbfb-5d47-437d-9dd1-ea788c1fc62d';
 
-// تهيئة FCM
-async function initMessaging() {
-  try {
-    if(!('Notification' in window) || !('serviceWorker' in navigator)) return;
-    messaging = getMessaging(app);
-
-    // استقبال الإشعارات لما التطبيق مفتوح (foreground)
-    onMessage(messaging, (payload) => {
-      const { title, body } = payload.notification || {};
-      showInAppNotification(title || 'OPERA STORE', body || '');
-    });
-  } catch(e) {
-    console.warn('FCM init error:', e);
-  }
-}
-
-// طلب إذن الإشعارات وحفظ الـ token
-async function requestNotificationPermission(custId) {
-  if(!messaging || VAPID_KEY === 'YOUR_VAPID_KEY_HERE') return;
-  try {
-    const permission = await Notification.requestPermission();
-    if(permission !== 'granted') return;
-
-    // تسجيل Service Worker
-    const sw = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: sw });
-
-    if(token) {
-      // حفظ الـ token في Firebase مرتبط بالعميل
-      await setDoc(doc(db, "fcm_tokens", custId.toString()), {
-        token,
-        custId: custId.toString(),
-        updatedAt: Date.now()
+// تهيئة OneSignal بعد تحميل الصفحة
+function initOneSignal(custId) {
+  if(typeof OneSignalDeferred === 'undefined') return;
+  OneSignalDeferred.push(async function(OneSignal) {
+    try {
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        notifyButton: { enable: false }, // مش هنظهر الزرار الافتراضي
+        promptOptions: {
+          slidedown: {
+            prompts: [{
+              type: 'push',
+              autoPrompt: false, // هنطلب إذن يدوياً
+              text: {
+                actionMessage: 'اسمح بالإشعارات عشان تعرف لما بيتسجل قسطك',
+                acceptButton: 'اسمح',
+                cancelButton: 'مش دلوقتي'
+              }
+            }]
+          }
+        }
       });
-      console.log('FCM token saved');
-    }
-  } catch(e) {
-    console.warn('FCM permission error:', e);
-  }
+
+      // ربط الـ External ID بالعميل عشان نبعتله إشعارات مخصصة
+      await OneSignal.login(custId.toString());
+
+      // إظهار طلب الإذن بعد ثانيتين
+      setTimeout(async () => {
+        const permission = await OneSignal.Notifications.permissionNative;
+        if(permission === 'default') {
+          OneSignal.Slidedown.promptPush();
+        }
+      }, 2000);
+
+      // استقبال الإشعارات لما التطبيق مفتوح
+      OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event) => {
+        event.preventDefault();
+        const { title, body } = event.notification;
+        showInAppNotification(title, body);
+      });
+
+    } catch(e) { console.warn('OneSignal init error:', e); }
+  });
 }
 
-// إشعار داخل التطبيق (لما يكون مفتوح)
+// إشعار داخل التطبيق لما يكون مفتوح
 function showInAppNotification(title, body) {
   const el = document.createElement('div');
   el.style.cssText = `
@@ -424,16 +429,23 @@ function showInAppNotification(title, body) {
     background:#0d0d14;border:1px solid rgba(124,107,255,0.4);
     border-radius:16px;padding:14px 20px;z-index:9999;
     font-family:'Cairo',sans-serif;max-width:320px;width:90%;
-    box-shadow:0 8px 32px rgba(0,0,0,0.5);animation:slideDown 0.3s ease;
+    box-shadow:0 8px 32px rgba(0,0,0,0.5);
     direction:rtl;text-align:right;
+    animation:slideDown 0.3s ease;
   `;
   el.innerHTML = `
-    <div style="font-size:0.65rem;color:#a78bfa;font-weight:700;margin-bottom:4px">🔔 ${title}</div>
-    <div style="font-size:0.82rem;color:#e8e8f0">${body}</div>
+    <div style="font-size:0.65rem;color:#a78bfa;font-weight:700;margin-bottom:4px">🔔 ${title||'OPERA STORE'}</div>
+    <div style="font-size:0.82rem;color:#e8e8f0;line-height:1.5">${body||''}</div>
   `;
   document.body.appendChild(el);
-  setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity 0.3s'; setTimeout(()=>el.remove(), 300); }, 4000);
+  setTimeout(() => {
+    el.style.transition = 'opacity 0.3s';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 300);
+  }, 4500);
 }
+
+window._initOneSignal = initOneSignal;
 
 // تحميل بيانات العملاء
 async function loadCustomers() {
@@ -486,8 +498,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const loadEl = document.getElementById('fb-loading');
   const loginEl = document.getElementById('login-screen');
 
-  // تهيئة FCM
-  await initMessaging();
+  // OneSignal يتهيأ تلقائياً عبر السكريبت في الـ head
 
   // تحقق من جلسة محفوظة
   const saved = localStorage.getItem('opera_customer_session');
@@ -504,8 +515,8 @@ window.addEventListener('DOMContentLoaded', async () => {
           loginEl.style.display = 'none';
           renderPortal(c);
           startSync(sess.custId);
-          // تجديد FCM token
-          setTimeout(() => requestNotificationPermission(c.id), 1500);
+          // تهيئة OneSignal لهذا العميل
+          setTimeout(() => { if(window._initOneSignal) window._initOneSignal(c.id); }, 1500);
           return;
         }
       }
@@ -558,8 +569,8 @@ window.doLogin = function() {
   renderPortal(c);
   startSync(c.id);
 
-  // طلب إذن الإشعارات بعد الدخول
-  setTimeout(() => requestNotificationPermission(c.id), 2000);
+  // تهيئة OneSignal بعد الدخول
+  setTimeout(() => { if(window._initOneSignal) window._initOneSignal(c.id); }, 2000);
 };
 
 // تسجيل الخروج
