@@ -2409,13 +2409,26 @@ function getCardStatus(c) {
 
 function render() {
   const list = document.getElementById('customers-list');
-  const q = document.getElementById('search').value.toLowerCase();
+  const q = document.getElementById('search').value.toLowerCase().trim();
   list.innerHTML = '';
 
   let mktNet=0, colNet=0, totalD=0, totalOD=0, totalCost=0, totalRem=0, totalMR=0;
   let overdueCount = 0;
 
-  const sorted = sortCustomers(customers);
+  // لو في بحث نرتب حسب التطابق، لو مفيش نرتب عادي
+  let sorted;
+  if(q) {
+    // رتّب: اسم يبدأ بالكلمة أولاً، بعدين اسم يحتوي عليها، بعدين باقي الحقول
+    sorted = [...customers].sort((a, b) => {
+      const an = (a.name||'').toLowerCase(), bn = (b.name||'').toLowerCase();
+      const aStarts = an.startsWith(q) ? 0 : an.includes(q) ? 1 : 2;
+      const bStarts = bn.startsWith(q) ? 0 : bn.includes(q) ? 1 : 2;
+      return aStarts - bStarts;
+    });
+  } else {
+    sorted = sortCustomers(customers);
+  }
+
   let shown = 0;
 
   sorted.forEach((c, i) => {
@@ -2428,7 +2441,9 @@ function render() {
 
     if(c.archived) return;
     totalMR += c.monthly;
-    if(rem <= 0 && q === '' && !currentDayFilter) return;
+    // لو مفيش بحث، اخبي المنتهيين
+    if(!q && rem <= 0 && !currentDayFilter) return;
+    // لو في بحث، فلتر بـ matchesSearch بس اظهر كل النتايج حتى المنتهيين
     if(q && !matchesSearch(c, q)) return;
     if(currentDayFilter && c.dueDay !== currentDayFilter) return;
 
