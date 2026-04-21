@@ -1368,8 +1368,6 @@ input, textarea, select { font-size: 0.88rem !important; }
       <button class="ghost-btn" id="btn-delete" style="border:1px solid var(--red);color:var(--red)" onclick="deleteCust(activeCustomerId)"><i class="fa-solid fa-trash"></i> حذف</button>
     </div>
     <button id="btn-portal" class="ghost-btn" style="width:100%;margin-top:8px;border:1px solid var(--pink);color:var(--pink)" onclick="openPortalPasswordModal()"><i class="fa-solid fa-door-open"></i> بوابة العميل</button>
-    <!-- زر اختبار الإشعار -->
-    <button id="btn-test-push" class="ghost-btn" style="width:100%;margin-top:8px;border:1px solid var(--accent2);color:var(--accent2)" onclick="testPushNotification()"><i class="fa-solid fa-bell"></i> اختبار إشعار</button>
   </div>
 </div>
 
@@ -1572,55 +1570,6 @@ input, textarea, select { font-size: 0.88rem !important; }
     </button>
   </div>
 </div>
-
-<!-- ===== OneSignal Push API ===== -->
-<script>
-const _OS_APP_ID  = 'eb630049-0434-4576-bdc5-fda0f9c3b915';
-const _OS_API_KEY = 'os_v2_app_5nrqasiegrcxnpof7wqptq5zcvxguarhwsdehl5ac6uxytgtftuvw6wbod7ncxagker4xmffxs3qkre5kearg6fvnftjovha373sbpq';
-
-window.sendPushToCustomer = async function(custId, title, body) {
-  try {
-    const res = await fetch('https://onesignal.com/api/v1/notifications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Key ' + _OS_API_KEY },
-      body: JSON.stringify({
-        app_id: _OS_APP_ID,
-        include_aliases: { external_id: [custId.toString()] },
-        target_channel: 'push',
-        headings: { ar: title, en: title },
-        contents: { ar: body, en: body },
-        url: 'https://opera-store.github.io/opera-customer/customer.html'
-      })
-    });
-    const data = await res.json();
-    if(data.id) {
-      showToast('📬 تم إرسال الإشعار للعميل', 'success', 'fa-bell');
-    } else {
-      console.warn('OneSignal error:', JSON.stringify(data));
-      showToast('❌ فشل إرسال الإشعار: ' + JSON.stringify(data.errors || data), 'error', 'fa-bell');
-    }
-  } catch(e) { console.warn('Push error:', e); }
-};
-
-window.sendPushToAll = async function(title, body) {
-  try {
-    const res = await fetch('https://onesignal.com/api/v1/notifications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Key ' + _OS_API_KEY },
-      body: JSON.stringify({
-        app_id: _OS_APP_ID,
-        included_segments: ['All'],
-        headings: { ar: title, en: title },
-        contents: { ar: body, en: body },
-        url: 'https://opera-store.github.io/opera-customer/customer.html'
-      })
-    });
-    const data = await res.json();
-    if(data.id) showToast('📬 تم إرسال الإشعار لكل العملاء', 'success', 'fa-bell');
-    else console.warn('Broadcast error:', JSON.stringify(data));
-  } catch(e) { console.warn('Broadcast error:', e); }
-};
-</script>
 
 <!-- ===== Firebase SDK ===== -->
 <script type="module">
@@ -2728,13 +2677,6 @@ function processPayment() {
   c.payments.push({amount:amt, date:fmtDate(document.getElementById('payment-date').value), fullDate:d.toISOString(), note:document.getElementById('payment-note').value});
   c.lastActionDate = Date.now(); save();
   logEdit('تسجيل قسط', c.name, `${fmt(amt)} ج.م`);
-  // إرسال Push Notification للعميل — بدون شرط
-  const paid2 = c.payments.reduce((s,p) => s+p.amount, 0);
-  const rem2 = (c.total-c.down-(c.earlyDiscount||0)) - paid2;
-  window.sendPushToCustomer(c.id,
-    '✅ تم تسجيل قسطك',
-    `تم استلام ${fmt(amt)} ج.م — المتبقي: ${fmt(Math.max(0,rem2))} ج.م`
-  );
   document.getElementById('payment-amount').value = '';
   document.getElementById('payment-note').value = '';
   openPaymentModal(activeCustomerId); render();
@@ -3862,15 +3804,6 @@ function clearActivityLog() {
   }
 }
 
-// ===== TEST PUSH =====
-function testPushNotification() {
-  if(!currentUser.isAdmin) return;
-  const c = customers.find(x => x.id === activeCustomerId);
-  if(!c) { showToast('مفيش عميل محدد', 'error', 'fa-exclamation'); return; }
-  showToast(`جاري إرسال إشعار تجريبي لـ ${c.name}...`, 'success', 'fa-spinner');
-  window.sendPushToCustomer(c.id, '🔔 اختبار إشعار', `ده إشعار تجريبي لـ ${c.name}`);
-}
-
 // ===== BROADCAST NOTIFICATION =====
 let _bcType = 'info';
 
@@ -3918,8 +3851,6 @@ function sendBroadcastToPortal() {
   document.getElementById('bc-status').textContent = `✅ تم نشر الإشعار لـ ${count} عميل`;
   showToast(`تم نشر الإشعار لـ ${count} عميل`, 'success', 'fa-bell');
   logEdit('إشعار جماعي', 'كل العملاء', title);
-  // إرسال Push Notification لكل العملاء
-  if(window.sendPushToAll) window.sendPushToAll(title, body);
 }
 
 function sendBroadcastWhatsApp() {
@@ -4182,7 +4113,6 @@ window.renderEditLog = renderEditLog;
 window.clearEditLog = clearEditLog;
 window.openDashboard = openDashboard;
 window.unlockScreen = unlockScreen;
-window.testPushNotification = testPushNotification;
 window.openBroadcast = openBroadcast;
 window.selectBcType = selectBcType;
 window.sendBroadcastToPortal = sendBroadcastToPortal;
