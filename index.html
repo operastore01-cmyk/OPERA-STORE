@@ -54,7 +54,7 @@ body {
   background-color:#000000;
   color:var(--text);
   min-height:100vh;
-  padding:16px 16px 40px;
+  padding:16px 16px 90px;
   overflow-x:hidden;
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
@@ -228,12 +228,12 @@ body::before {
 
 /* ===== STATS BAR ===== */
 .stats-bar {
-  display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
-  margin-bottom:18px; animation:fadeUp 0.5s 0.1s ease both;
+  display:grid; grid-template-columns:repeat(3,1fr); gap:6px;
+  margin-bottom:10px; animation:fadeUp 0.5s 0.1s ease both;
 }
 .stat-pill {
   background:var(--surface); border:1px solid var(--border);
-  border-radius:var(--radius); padding:14px 12px;
+  border-radius:10px; padding:7px 8px;
   text-align:center; position:relative; overflow:hidden;
   cursor:pointer; transition:all 0.25s;
 }
@@ -244,19 +244,34 @@ body::before {
 }
 .stat-pill:hover { transform:translateY(-2px); border-color:var(--border2); box-shadow:var(--glow); }
 .stat-pill:hover::before { opacity:1; }
-.stat-pill .lbl { font-size:0.62rem; color:var(--muted); display:block; margin-bottom:4px; }
-.stat-pill .val { font-size:1.1rem; font-weight:900; }
-.stat-pill .trend { font-size:0.58rem; color:var(--muted); margin-top:3px; display:block; }
+.stat-pill .lbl { font-size:0.55rem; color:var(--muted); display:block; margin-bottom:2px; }
+.stat-pill .val { font-size:0.88rem; font-weight:900; }
+.stat-pill .trend { font-size:0.52rem; color:var(--muted); margin-top:2px; display:block; }
 
 /* ===== PROGRESS BAR ===== */
-.mini-progress { height:3px; background:rgba(120,120,200,0.12); border-radius:10px; margin-top:8px; overflow:hidden; }
+.mini-progress { height:2px; background:rgba(120,120,200,0.12); border-radius:10px; margin-top:5px; overflow:hidden; }
 .mini-progress-fill { height:100%; border-radius:10px; transition:width 0.6s cubic-bezier(.4,0,.2,1); }
 
 .actions-bar {
-  display:flex; gap:8px; margin-bottom:18px;
-  align-items:center; flex-wrap:wrap;
+  display:flex; gap:6px; margin-bottom:10px;
+  align-items:center; flex-wrap:nowrap; overflow-x:auto;
+  scrollbar-width:none;
   animation:fadeUp 0.5s 0.15s ease both;
+  padding-bottom:2px;
 }
+.actions-bar::-webkit-scrollbar { display:none; }
+.sort-chips-inline {
+  display:flex; gap:4px; flex-shrink:0;
+}
+.sort-chips-inline .sort-chip {
+  height:34px; padding:0 10px; border-radius:20px;
+  background:var(--surface2); border:1px solid var(--border);
+  color:var(--muted); font-family:'Cairo',sans-serif; font-size:0.66rem; font-weight:700;
+  cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;
+  display:flex; align-items:center;
+}
+.sort-chips-inline .sort-chip:hover { border-color:var(--border2); color:var(--text); }
+.sort-chips-inline .sort-chip.active { background:rgba(124,107,255,0.15); border-color:var(--accent); color:var(--accent2); }
 .search-wrap { flex:1; position:relative; min-width:140px; }
 .search-wrap i { position:absolute; right:14px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:0.82rem; pointer-events:none; }
 .search-wrap input { padding:0 38px 0 14px; }
@@ -453,12 +468,12 @@ select option { background:var(--surface2); }
 .ghost-btn { padding:10px 6px; border-radius:var(--radius); background:transparent; cursor:pointer; font-family:'Cairo',sans-serif; font-size:0.62rem; font-weight:700; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:4px; }
 .ghost-btn:hover { transform:translateY(-2px); filter:brightness(1.2); }
 
-.report-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.rep-card { background:var(--surface2); border:1px solid var(--border); border-top:2px solid; border-radius:var(--radius); padding:14px; text-align:center; transition:transform 0.2s; cursor:pointer; }
+.report-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.rep-card { background:var(--surface2); border:1px solid var(--border); border-top:2px solid; border-radius:var(--radius); padding:6px 10px; text-align:center; transition:transform 0.2s; cursor:pointer; display:flex; flex-direction:column; justify-content:center; min-height:52px; }
 .rep-card:hover { transform:translateY(-2px); }
-.rep-card .lbl { font-size:0.6rem; color:var(--muted); display:block; margin-bottom:5px; }
-.rep-card .val { font-size:1rem; font-weight:800; }
-.rep-card .sub { font-size:0.6rem; color:var(--muted); margin-top:4px; }
+.rep-card .lbl { font-size:0.55rem; color:var(--muted); display:block; margin-bottom:2px; }
+.rep-card .val { font-size:0.88rem; font-weight:800; }
+.rep-card .sub { font-size:0.55rem; color:var(--muted); margin-top:2px; }
 
 /* ===== TOAST ===== */
 .toast-container { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
@@ -630,7 +645,72 @@ select option { background:var(--surface2); }
 .adv-filter-toggle:hover { background: rgba(124,107,255,0.18); }
 .adv-filter-toggle.has-filter { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-/* ===== SCROLLBAR ===== */
+/* ===== BOTTOM NAV BAR ===== */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 500;
+  background: rgba(13,13,20,0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-around;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  height: 68px;
+}
+body[data-theme="light"] .bottom-nav {
+  background: rgba(245,245,252,0.96);
+}
+.nav-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; cursor: pointer; padding: 4px 6px; border-radius: 10px;
+  border: none; background: transparent; color: var(--muted);
+  font-family: 'Cairo', sans-serif; font-size: 0.5rem; font-weight: 700;
+  transition: all 0.2s; min-width: 36px;
+}
+.nav-btn i { font-size: 1rem; transition: all 0.2s; }
+.nav-btn:hover { color: var(--accent2); }
+.nav-btn:active { transform: scale(0.93); }
+.nav-btn.active { color: var(--accent2); }
+/* Center FAB */
+.nav-fab {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 4px 20px rgba(124,107,255,0.45);
+  transition: all 0.2s; flex-shrink: 0;
+  font-size: 1.5rem; color: #fff; font-weight: 300;
+  margin: 0 4px;
+}
+.nav-fab:hover { transform: scale(1.1) translateY(-2px); box-shadow: 0 6px 28px rgba(124,107,255,0.6); }
+.nav-fab:active { transform: scale(0.95); }
+
+/* Make sort-chip work in inline context */
+.actions-bar .sort-chip {
+  height: 34px; display: flex; align-items: center;
+}
+
+/* Day group smaller in actions bar */
+.actions-bar .day-group { height: 34px; flex-shrink: 0; }
+.actions-bar .day-btn { font-size: 0.68rem !important; }
+
+/* Search in actions bar */
+.actions-bar .search-wrap { min-width: 120px; flex-shrink: 1; flex: 1; }
+.actions-bar input { min-height: 34px !important; font-size: 0.8rem !important; padding: 6px 36px 6px 12px; }
+
+/* adv-filter-toggle in actions bar */
+.actions-bar .adv-filter-toggle {
+  font-size: 0.68rem; padding: 0 10px; height: 34px;
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+}
+
+/* ===== MENU MODAL sections ===== */
+.menu-section-label {
+  font-size: 0.6rem; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 12px 4px 6px; border-bottom: 1px solid var(--border);
+  margin-bottom: 6px; margin-top: 4px;
+}
+.menu-section-label:first-child { padding-top: 0; }
+
 ::-webkit-scrollbar { width:4px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:10px; }
@@ -786,24 +866,28 @@ input, textarea, select { font-size: 0.88rem !important; }
     </div>
   </div>
 
-  <!-- ACTIONS BAR -->
+  <!-- ACTIONS BAR (single row: search | filter | 10/20/30 | sort chips) -->
   <div class="actions-bar">
     <div class="search-wrap">
       <i class="fa-solid fa-magnifying-glass"></i>
       <input type="text" id="search" placeholder="بحث بالاسم / المنتج / الكود / رقم العملية..." oninput="onSearch()">
       <div class="search-clear" id="search-clear" onclick="clearSearch()"><i class="fa-solid fa-xmark"></i></div>
     </div>
+    <div class="adv-filter-toggle" id="adv-filter-toggle" onclick="toggleAdvFilter()">
+      <i class="fa-solid fa-sliders"></i> فلتر
+    </div>
     <div class="day-group">
       <button class="day-btn" onclick="filterByDay(10)">10</button>
       <button class="day-btn" onclick="filterByDay(20)">20</button>
       <button class="day-btn" onclick="filterByDay(30)">30</button>
     </div>
-    <div class="adv-filter-toggle" id="adv-filter-toggle" onclick="toggleAdvFilter()">
-      <i class="fa-solid fa-sliders"></i> فلتر
+    <div class="sort-chips-inline">
+      <div class="sort-chip active" id="sort-recent" onclick="setSort('recent')">الأحدث</div>
+      <div class="sort-chip" id="sort-due-high" onclick="setSort('due-high')">الأعلى تأخير</div>
+      <div class="sort-chip" id="sort-name" onclick="setSort('name')">أ-ي</div>
+      <div class="sort-chip" id="sort-monthly" onclick="setSort('monthly')">الأعلى قسط</div>
+      <div class="sort-chip" id="sort-remaining" onclick="setSort('remaining')">المتبقي</div>
     </div>
-    <button class="chip-btn accent" id="add-cust-btn" onclick="openM('add-modal')">+ اضافة</button>
-    <button class="chip-btn" style="color:var(--orange)" id="report-btn" onclick="openM('report-modal')">تقرير</button>
-    <button class="chip-btn" onclick="openM('menu-modal')">المزيد</button>
   </div>
 
   <!-- ADVANCED FILTER PANEL -->
@@ -856,15 +940,6 @@ input, textarea, select { font-size: 0.88rem !important; }
   <!-- ACTIVE FILTER CHIPS -->
   <div class="filter-active-chips" id="active-filter-chips"></div>
 
-  <!-- SORT BAR -->
-  <div class="sort-bar">
-    <div class="sort-chip active" id="sort-recent" onclick="setSort('recent')">الاحدث</div>
-    <div class="sort-chip" id="sort-due-high" onclick="setSort('due-high')">الاعلى تاخير</div>
-    <div class="sort-chip" id="sort-name" onclick="setSort('name')">أ-ي الاسم</div>
-    <div class="sort-chip" id="sort-monthly" onclick="setSort('monthly')">الاعلى قسط</div>
-    <div class="sort-chip" id="sort-remaining" onclick="setSort('remaining')">المتبقي</div>
-  </div>
-
   <div class="customer-grid" id="customers-list"></div>
 </div>
 
@@ -873,33 +948,48 @@ input, textarea, select { font-size: 0.88rem !important; }
   <div class="modal-panel">
     <div class="back-btn" onclick="closeM('menu-modal')">رجوع</div>
     <div class="modal-title">القائمة الإضافية</div>
+
+    <!-- قسم: المالية والحسابات -->
+    <div class="menu-section-label">💰 المالية والحسابات</div>
     <button class="menu-btn" onclick="openSavingsModal()">
       <i class="fa-solid fa-piggy-bank" style="color:var(--pink)"></i> حسابات تحويش
       <span id="savings-badge" class="badge" style="background:rgba(244,114,182,0.15);color:var(--pink)"></span>
     </button>
-    <button class="menu-btn" onclick="openCollections()"><i class="fa-solid fa-money-bill-trend-up" style="color:var(--blue)"></i> التحصيلات</button>
-    <button class="menu-btn" onclick="openProductsModal()"><i class="fa-solid fa-boxes-stacked" style="color:var(--green)"></i> المنتجات</button>
-    <button class="menu-btn" onclick="openArchive()"><i class="fa-solid fa-box-archive" style="color:var(--accent2)"></i> الأرشيف</button>
-    <button class="menu-btn" onclick="openCustomMsgs()"><i class="fa-solid fa-comment-dots" style="color:var(--green)"></i> رسائل مخصصة</button>
-    <button class="menu-btn" id="menu-broadcast-btn" onclick="openBroadcast()"><i class="fa-solid fa-tower-broadcast" style="color:var(--pink)"></i> إشعار لكل العملاء</button>
-    <button class="menu-btn" id="menu-logs-btn" onclick="openLogs()"><i class="fa-solid fa-receipt" style="color:var(--blue)"></i> سجل العمليات</button>
-    <button class="menu-btn" id="menu-activity-btn" onclick="openActivityLog()"><i class="fa-solid fa-shield-halved" style="color:var(--pink)"></i> سجل النشاط</button>
-    <button class="menu-btn" id="menu-editlog-btn" onclick="openEditLog()"><i class="fa-solid fa-pen-to-square" style="color:var(--orange)"></i> سجل التعديلات</button>
-    <button class="menu-btn" id="menu-dashboard-btn" onclick="openDashboard()"><i class="fa-solid fa-chart-bar" style="color:var(--accent2)"></i> لوحة التحليلات</button>
+    <button class="menu-btn" style="color:var(--orange)" id="report-btn" onclick="openM('report-modal')">
+      <i class="fa-solid fa-file-chart-column" style="color:var(--orange)"></i> التقرير المالي
+    </button>
     <button class="menu-btn" onclick="showOverdueList()">
       <i class="fa-solid fa-clock-rotate-left" style="color:var(--red)"></i> قائمة المتأخرين
       <span id="overdue-badge" class="badge" style="background:rgba(248,113,113,0.15);color:var(--red)"></span>
     </button>
+
+    <!-- قسم: البيانات والتصدير -->
+    <div class="menu-section-label">📦 البيانات والتصدير</div>
+    <button class="menu-btn" onclick="openProductsModal()"><i class="fa-solid fa-boxes-stacked" style="color:var(--green)"></i> المنتجات</button>
+    <button class="menu-btn" onclick="openArchive()"><i class="fa-solid fa-box-archive" style="color:var(--accent2)"></i> الأرشيف</button>
     <button class="menu-btn" id="menu-pdf-btn" onclick="exportPDF()"><i class="fa-solid fa-file-pdf" style="color:var(--orange)"></i> تصدير تقرير PDF</button>
     <button class="menu-btn" id="menu-excel-btn" onclick="exportExcel()"><i class="fa-solid fa-file-excel" style="color:var(--green)"></i> تصدير Excel</button>
+
+    <!-- قسم: التواصل -->
+    <div class="menu-section-label">💬 التواصل</div>
+    <button class="menu-btn" onclick="openCustomMsgs()"><i class="fa-solid fa-comment-dots" style="color:var(--green)"></i> رسائل مخصصة</button>
+    <button class="menu-btn" id="menu-broadcast-btn" onclick="openBroadcast()"><i class="fa-solid fa-tower-broadcast" style="color:var(--pink)"></i> إشعار لكل العملاء</button>
     <button class="menu-btn" onclick="enableNotifications()"><i class="fa-solid fa-bell" style="color:var(--orange)"></i> تفعيل الإشعارات الذكية</button>
+
+    <!-- قسم: السجلات والمتابعة -->
+    <div class="menu-section-label">📋 السجلات والمتابعة</div>
+    <button class="menu-btn" id="menu-activity-btn" onclick="openActivityLog()"><i class="fa-solid fa-shield-halved" style="color:var(--pink)"></i> سجل النشاط</button>
+    <button class="menu-btn" id="menu-editlog-btn" onclick="openEditLog()"><i class="fa-solid fa-pen-to-square" style="color:var(--orange)"></i> سجل التعديلات</button>
+    <button class="menu-btn" id="menu-logs-btn" onclick="openLogs()"><i class="fa-solid fa-receipt" style="color:var(--blue)"></i> سجل العمليات</button>
+
+    <!-- قسم: الإدارة والإعدادات -->
+    <div class="menu-section-label">⚙️ الإدارة والإعدادات</div>
+    <button class="menu-btn" id="menu-staff-btn" onclick="openStaffModal()"><i class="fa-solid fa-users-gear" style="color:var(--blue)"></i> إدارة الموظفين</button>
+    <button class="menu-btn" id="menu-creds-btn" onclick="openCredentialsModal()"><i class="fa-solid fa-user-lock" style="color:var(--accent2)"></i> المستخدم</button>
+    <button class="menu-btn" id="menu-staff-settings-btn" onclick="openStaffSettingsModal()" style="display:none;"><i class="fa-solid fa-gear" style="color:var(--accent2)"></i> الإعدادات</button>
     <button class="menu-btn" id="menu-trash-btn" onclick="openTrash()"><i class="fa-solid fa-trash-can" style="color:var(--red)"></i> سلة المهملات
       <span id="trash-badge" class="badge" style="background:rgba(248,113,113,0.15);color:var(--red)"></span>
     </button>
-    <button class="menu-btn" id="menu-staff-btn" onclick="openStaffModal()"><i class="fa-solid fa-users-gear" style="color:var(--blue)"></i> إدارة الموظفين</button>
-    <button class="menu-btn" id="menu-creds-btn" onclick="openCredentialsModal()"><i class="fa-solid fa-user-lock" style="color:var(--accent2)"></i> المستخدم</button>
-    <!-- زر الإعدادات للموظف فقط -->
-    <button class="menu-btn" id="menu-staff-settings-btn" onclick="openStaffSettingsModal()" style="display:none;"><i class="fa-solid fa-gear" style="color:var(--accent2)"></i> الإعدادات</button>
   </div>
 </div>
 
@@ -1355,6 +1445,43 @@ input, textarea, select { font-size: 0.88rem !important; }
   </div>
 </div>
 </div> <!-- end dashboard-main -->
+
+<!-- ===== BOTTOM NAV BAR ===== -->
+<div class="bottom-nav" id="bottom-nav">
+  <!-- يسار: متأخرين + عمليات + تحصيلات -->
+  <button class="nav-btn" onclick="showOverdueList()">
+    <i class="fa-solid fa-clock-rotate-left"></i>
+    <span>المتأخرين</span>
+  </button>
+  <button class="nav-btn" onclick="openLogs()">
+    <i class="fa-solid fa-receipt"></i>
+    <span>العمليات</span>
+  </button>
+  <button class="nav-btn" onclick="openCollections()">
+    <i class="fa-solid fa-money-bill-trend-up"></i>
+    <span>التحصيلات</span>
+  </button>
+
+  <!-- وسط: زر + -->
+  <button class="nav-fab" onclick="openM('add-modal')" id="add-cust-btn" title="إضافة عميل جديد">
+    <span style="font-size:1.6rem;line-height:1;margin-top:-1px">+</span>
+  </button>
+
+  <!-- يمين: تحليلات + تحويش + المزيد -->
+  <button class="nav-btn" onclick="openDashboard()">
+    <i class="fa-solid fa-chart-bar"></i>
+    <span>التحليلات</span>
+  </button>
+  <button class="nav-btn" onclick="openSavingsModal()">
+    <i class="fa-solid fa-piggy-bank"></i>
+    <span>التحويش</span>
+  </button>
+  <button class="nav-btn" onclick="openM('menu-modal')">
+    <i class="fa-solid fa-grip"></i>
+    <span>المزيد</span>
+  </button>
+</div>
+
 </div> <!-- end app-main -->
 
 <!-- ===== BROADCAST NOTIFICATION MODAL ===== -->
@@ -1830,7 +1957,6 @@ function applyPermissions() {
   document.getElementById('menu-logs-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('menu-activity-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('menu-editlog-btn').style.display = isAdmin ? 'flex' : 'none';
-  document.getElementById('menu-dashboard-btn').style.display = (isAdmin || perms.canViewReport) ? 'flex' : 'none';
   document.getElementById('menu-pdf-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('menu-trash-btn').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('menu-staff-btn').style.display = isAdmin ? 'flex' : 'none';
