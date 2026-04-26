@@ -994,7 +994,7 @@ input, textarea, select { font-size: 0.88rem !important; }
   <div class="actions-bar">
     <div class="search-wrap">
       <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" id="search" placeholder="بحث بالاسم أو المنتج..." oninput="onSearch()">
+      <input type="text" id="search" placeholder="بحث بالاسم / المنتج / الكود / رقم العملية..." oninput="onSearch()">
       <div class="search-clear" id="search-clear" onclick="clearSearch()"><i class="fa-solid fa-xmark"></i></div>
     </div>
     <div class="day-group">
@@ -1456,7 +1456,14 @@ input, textarea, select { font-size: 0.88rem !important; }
       <button class="btn btn-blue" onclick="processPayment()"><i class="fa-solid fa-plus"></i> حفظ العملية</button>
     </div>
 
-    <div class="section-label">سجل الدفعات</div>
+    <div class="section-label" style="display:flex;align-items:center;justify-content:space-between">
+      <span>سجل الدفعات</span>
+      <div style="position:relative;display:flex;align-items:center">
+        <i class="fa-solid fa-magnifying-glass" style="position:absolute;right:8px;color:var(--muted);font-size:0.6rem;pointer-events:none"></i>
+        <input type="text" id="pay-history-search" placeholder="ابحث برقم العملية..." oninput="filterPayHistory()"
+          style="padding:5px 24px 5px 8px;font-size:0.68rem;border-radius:var(--radius);border:1px solid var(--border2);background:var(--surface2);color:var(--text);width:160px;direction:rtl">
+      </div>
+    </div>
     <div id="payment-history"></div>
 
     <div class="actions-grid" id="cust-actions-grid">
@@ -2581,7 +2588,7 @@ function render() {
       <div class="status-dot ${status}"></div>
       <div>
         <span class="c-name">${c.name}</span>
-        <span class="c-sub">${c.prod} · يوم ${c.dueDay} <span style="color:var(--accent2);font-weight:700">#${c.custCode||'--'}</span></span>
+        <span class="c-sub">${c.prod} · يوم ${c.dueDay} <span onclick="copyID(event,'${c.custCode||''}','${c.name}')" style="color:var(--accent2);font-weight:700;cursor:pointer;background:rgba(124,107,255,0.15);padding:1px 6px;border-radius:8px;font-size:0.58rem" title="اضغط لنسخ الـ ID">ID ${c.custCode||'--'}</span></span>
       </div>
       <div class="c-cell hide-m"><span class="c-lbl">قسط شهري</span><span class="c-val" style="color:var(--blue)">${fmt(c.monthly)}</span></div>
       <div class="c-cell hide-m"><span class="c-lbl">تقدم السداد</span><span class="c-val" style="color:${progColor}">${pct}%</span></div>
@@ -2724,7 +2731,12 @@ function openPaymentModal(id) {
   document.getElementById('modal-prod-info').innerText = `${c.prod} | قسط: ${fmt(c.monthly)} | تعاقد: ${fmtDate(c.receiveDate)}`;
   // عرض كود العميل
   let custCodeEl = document.getElementById('modal-cust-code');
-  if(custCodeEl) custCodeEl.textContent = c.custCode ? `#${c.custCode}` : '';
+  if(custCodeEl) {
+    custCodeEl.textContent = c.custCode ? 'ID ' + c.custCode : '';
+    custCodeEl.title = 'اضغط لنسخ الـ ID';
+    custCodeEl.style.cursor = 'pointer';
+    custCodeEl.onclick = function(e) { copyID(e, c.custCode, c.name); };
+  }
   document.getElementById('modal-inst-period-info').innerText = `المدة: ${tm} شهر | متبقي: ${remM} قسط | يوم: ${c.dueDay}`;
   document.getElementById('modal-delay-info').innerText = due>0&&c.monthly>0 ? `تاخير: ${lateM} شهر تقريبا` : 'حالة السداد: منتظم';
   document.getElementById('modal-delay-info').style.color = due > 0 ? 'var(--red)' : 'var(--green)';
@@ -3032,11 +3044,13 @@ function genCustCode() {
 }
 
 function genPayRef(c) {
-  // صيغة: PR-[كود العميل]-[رقم الدفعة]
-  const code = c.custCode || c.id.toString().slice(-4);
-  const seq = (c.payments.length + 1).toString().padStart(3,'0');
-  const ts = Date.now().toString().slice(-4);
-  return `PR-${code}-${seq}-${ts}`;
+  // رقم عملية من 5 أرقام فريد — مثال: 47382
+  // نضمن الفرادة: (timestamp mod 89999) + 10000 دايماً بين 10000 و99999
+  const ts = Date.now();
+  const seq = c.payments.length + 1;
+  // خلط بين الـ timestamp والـ seq وكود العميل عشان يكون فريد
+  const seed = (ts + seq * 1000 + parseInt((c.custCode||c.id.toString().slice(-4)), 10)) % 90000;
+  return String(10000 + seed);
 }
 
 // ترقيم العملاء القديمين اللي مالهمش custCode
@@ -3083,9 +3097,9 @@ function printReceipt(custId, payIdx) {
     <h2>🏪 OPERA STORE</h2>
     <p>إيصال دفع رسمي</p>
   </div>
-  <div class="ref-badge">رقم العملية: ${p.ref || '--'}</div>
+  <div class="ref-badge">🔢 رقم العملية: <strong>${p.ref || '--'}</strong></div>
   <div class="row"><span class="lbl">اسم العميل</span><span class="val">${c.name}</span></div>
-  <div class="row"><span class="lbl">كود العميل</span><span class="val">#${c.custCode||'--'}</span></div>
+  <div class="row"><span class="lbl">كود العميل (ID)</span><span class="val">ID ${c.custCode||'--'}</span></div>
   <div class="row"><span class="lbl">المنتج</span><span class="val">${c.prod||'--'}</span></div>
   <div class="row"><span class="lbl">تاريخ الدفع</span><span class="val">${p.date}</span></div>
   <div class="row"><span class="lbl">البيان</span><span class="val">${p.note||'قسط شهري'}</span></div>
@@ -3823,10 +3837,35 @@ function onSearch() {
   render();
 }
 
+function copyID(e, id, name) {
+  e.stopPropagation();
+  if(!id) return;
+  navigator.clipboard.writeText(String(id)).then(() => {
+    showToast('تم نسخ ID ' + id + ' (' + name + ')', 'success', 'fa-copy');
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = String(id);
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('تم نسخ ID ' + id, 'success', 'fa-copy');
+  });
+}
+
 function matchesSearch(c, q) {
   if(!q) return true;
-  const ql = q.toLowerCase();
+  const ql = q.toLowerCase().replace(/^#/, '');
   const paid = c.payments.reduce((s,p) => s+p.amount, 0);
+
+  // بحث بكود العميل
+  if((c.custCode||'').toString().includes(ql)) return true;
+
+  // بحث برقم عملية التسديد (TXN-...)
+  if(c.payments.some(p => (p.ref||'').toLowerCase().includes(ql))) return true;
+
+  // البحث العادي
   return (c.name||'').toLowerCase().includes(ql) ||
          (c.prod||'').toLowerCase().includes(ql) ||
          (c.phone||'').replace(/\D/g,'').includes(ql.replace(/\D/g,'')) ||
@@ -4014,6 +4053,74 @@ function openDashboard() {
   openM('dashboard-modal');
 }
 
+
+// ===== FILTER PAYMENT HISTORY =====
+function filterPayHistory() {
+  const q = (document.getElementById('pay-history-search')?.value || '').toLowerCase().trim();
+  const c = customers.find(x => x.id === activeCustomerId);
+  if(!c) return;
+  const ed = c.earlyDiscount || 0;
+  const itc = c.total - c.down - ed;
+  const allPaid = c.payments.reduce((s,p) => s+p.amount, 0);
+
+  const filtered = q
+    ? [...c.payments].reverse().filter(p =>
+        (p.ref||'').toLowerCase().includes(q) ||
+        (p.note||'').toLowerCase().includes(q) ||
+        (p.date||'').includes(q) ||
+        String(p.amount).includes(q)
+      )
+    : [...c.payments].reverse();
+
+  const el = document.getElementById('payment-history');
+  if(!el) return;
+
+  if(!filtered.length) {
+    el.innerHTML = '<div class="empty" style="padding:16px"><i class="fa-solid fa-magnifying-glass"></i><p>لا توجد نتائج</p></div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map((p, idx) => {
+    const originalIdx = c.payments.indexOf(p);
+    const paid = c.payments.reduce((s,x) => s+x.amount, 0);
+    return `<div class="pay-row" style="grid-template-columns:1fr 1.4fr 1fr 1.1fr">
+      <div>
+        <div style="font-weight:700;color:var(--green)">${fmt(p.amount)} ج.م</div>
+        <div style="font-size:0.58rem;color:var(--accent2);margin-top:2px;cursor:pointer;font-weight:800"
+             onclick="copyPayRef(event,'${p.ref||''}')"
+             title="اضغط لنسخ رقم العملية">
+          ${p.ref ? '🔢 ' + p.ref : ''}
+        </div>
+      </div>
+      <div style="font-size:0.65rem;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
+        <div>${p.note||'--'}</div>
+        <div style="color:var(--blue);margin-top:2px">${p.by ? '👤 '+p.by : ''}</div>
+      </div>
+      <div style="font-size:0.65rem;color:var(--muted)">${p.date}</div>
+      <div style="display:flex;gap:4px;justify-content:flex-end">
+        <button class="btn-sm btn-wa" onclick="sendWA('${c.phone}','${c.name}',${p.amount},${itc - paid},'${p.ref||''}')">إيصال</button>
+        ${(hasPermission('canDelete')||currentUser.isAdmin) ? `<button class="btn-sm btn-del" onclick="deletePayment(${originalIdx})">حذف</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function copyPayRef(e, ref) {
+  e.stopPropagation();
+  if(!ref) return;
+  navigator.clipboard.writeText(String(ref)).then(() => {
+    showToast('تم نسخ رقم العملية: ' + ref, 'success', 'fa-copy');
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = String(ref);
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('تم نسخ رقم العملية: ' + ref, 'success', 'fa-copy');
+  });
+}
+
 function buildDashboard() {
   const container = document.getElementById('dashboard-content');
 
@@ -4065,6 +4172,36 @@ function buildDashboard() {
     return s + (rem > 0 && !c.archived ? c.monthly : 0);
   }, 0);
   const growthPct = lastMonthPaid > 0 ? Math.round(((thisMonthPaid - lastMonthPaid) / lastMonthPaid) * 100) : 0;
+
+  // ===== إحصائيات الأيام 10 / 20 / 30 =====
+  function getDayStats(day) {
+    const active = customers.filter(c => !c.archived && c.dueDay === day);
+    const totalMonthly = active.reduce((s,c) => s+c.monthly, 0);
+    const due = active.reduce((s,c) => s+calculateDueAmount(c), 0);
+    const ok = active.filter(c => getCardStatus(c) === 'ok').length;
+    const late = active.filter(c => getCardStatus(c) === 'bad').length;
+    const warn = active.filter(c => getCardStatus(c) === 'warn').length;
+    const done = active.filter(c => getCardStatus(c) === 'done').length;
+    return { count: active.length, totalMonthly, due, ok, late, warn, done };
+  }
+  const day10 = getDayStats(10);
+  const day20 = getDayStats(20);
+  const day30 = getDayStats(30);
+
+  // ===== إحصائيات إضافية =====
+  const totalContracts = customers.filter(c => !c.archived).length;
+  const completedContracts = customers.filter(c => {
+    const paid = c.payments.reduce((s,p)=>s+p.amount,0);
+    const rem = (c.total-c.down-(c.earlyDiscount||0)) - paid;
+    return rem <= 0;
+  }).length;
+  const totalPortfolio = customers.filter(c=>!c.archived).reduce((s,c) => s+(c.total-c.down-(c.earlyDiscount||0)), 0);
+  const totalCollectedAll = customers.reduce((s,c) => s+c.payments.reduce((a,p)=>a+p.amount,0), 0);
+  const collectionRate = totalPortfolio > 0 ? Math.round((totalCollectedAll/totalPortfolio)*100) : 0;
+  const avgMonthly = totalContracts > 0
+    ? Math.round(customers.filter(c=>!c.archived).reduce((s,c)=>s+c.monthly,0) / totalContracts)
+    : 0;
+  const totalDueNow = customers.filter(c=>!c.archived).reduce((s,c) => s+calculateDueAmount(c), 0);
 
   // بناء HTML
   container.innerHTML = `
@@ -4150,19 +4287,77 @@ function buildDashboard() {
           </div>`).join('')}
       </div>
     </div>
+
+    <!-- إحصائيات الأيام 10 / 20 / 30 -->
+    <div class="chart-card" style="margin-top:12px">
+      <div class="chart-title">📅 أقساط الشهر القادم — حسب يوم الاستحقاق</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
+        ${[{day:10,data:day10,color:'var(--blue)'},{day:20,data:day20,color:'var(--accent)'},{day:30,data:day30,color:'var(--orange)'}].map(({day,data,color}) => `
+          <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius2);padding:10px;text-align:center;position:relative;overflow:hidden">
+            <div style="font-size:1.1rem;font-weight:900;color:${color}">يوم ${day}</div>
+            <div style="font-size:0.6rem;color:var(--muted);margin:2px 0 6px">الشهر القادم</div>
+            <div style="font-size:0.85rem;font-weight:800;color:var(--text)">${fmt(data.totalMonthly)}</div>
+            <div style="font-size:0.55rem;color:var(--muted);margin-bottom:6px">متوقع التحصيل</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:0.58rem">
+              <div style="background:rgba(52,211,153,0.1);border-radius:4px;padding:3px;color:var(--green)">✅ ${data.ok}</div>
+              <div style="background:rgba(248,113,113,0.1);border-radius:4px;padding:3px;color:var(--red)">❌ ${data.late}</div>
+              <div style="background:rgba(251,146,60,0.1);border-radius:4px;padding:3px;color:var(--orange)">⚠️ ${data.warn}</div>
+              <div style="background:rgba(107,107,138,0.1);border-radius:4px;padding:3px;color:var(--muted)">✓ ${data.done}</div>
+            </div>
+            ${data.due > 0 ? `<div style="margin-top:6px;font-size:0.6rem;background:rgba(248,113,113,0.1);border-radius:4px;padding:3px;color:var(--red);font-weight:700">متأخر: ${fmt(data.due)}</div>` : `<div style="margin-top:6px;font-size:0.6rem;background:rgba(52,211,153,0.1);border-radius:4px;padding:3px;color:var(--green)">لا متأخرات 🎉</div>`}
+            <div style="font-size:0.58rem;color:var(--muted);margin-top:4px">${data.count} عميل</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- إحصائيات عامة إضافية -->
+    <div class="chart-card" style="margin-top:12px">
+      <div class="chart-title">📊 إحصائيات المحفظة الكاملة</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
+          <div style="font-size:0.58rem;color:var(--muted)">نسبة التحصيل الكلية</div>
+          <div style="font-size:1.2rem;font-weight:900;color:${collectionRate>=80?'var(--green)':collectionRate>=50?'var(--orange)':'var(--red)'}">${collectionRate}%</div>
+          <div style="height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:4px">
+            <div style="height:100%;width:${collectionRate}%;background:${collectionRate>=80?'var(--green)':collectionRate>=50?'var(--orange)':'var(--red)'};border-radius:3px;transition:width 0.8s"></div>
+          </div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
+          <div style="font-size:0.58rem;color:var(--muted)">إجمالي المحفظة</div>
+          <div style="font-size:0.85rem;font-weight:800;color:var(--accent2)">${fmt(totalPortfolio)}</div>
+          <div style="font-size:0.55rem;color:var(--muted);margin-top:2px">محصّل: ${fmt(totalCollectedAll)}</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
+          <div style="font-size:0.58rem;color:var(--muted)">متوسط القسط الشهري</div>
+          <div style="font-size:1rem;font-weight:800;color:var(--blue)">${fmt(avgMonthly)}</div>
+          <div style="font-size:0.55rem;color:var(--muted);margin-top:2px">لكل عميل نشط</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
+          <div style="font-size:0.58rem;color:var(--muted)">العقود المكتملة</div>
+          <div style="font-size:1rem;font-weight:800;color:var(--green)">${completedContracts}</div>
+          <div style="font-size:0.55rem;color:var(--muted);margin-top:2px">من أصل ${totalContracts + completedContracts} عقد</div>
+        </div>
+        <div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:var(--radius);padding:10px;text-align:center;grid-column:span 2">
+          <div style="font-size:0.58rem;color:var(--red)">⚠️ إجمالي المتأخرات الآن</div>
+          <div style="font-size:1.1rem;font-weight:900;color:var(--red)">${fmt(totalDueNow)} ج.م</div>
+          <div style="font-size:0.55rem;color:var(--muted);margin-top:2px">على ${customers.filter(c=>!c.archived && calculateDueAmount(c)>0).length} عميل</div>
+        </div>
+      </div>
+    </div>
   `;
 }
 
 function buildDonut(segments) {
-  const total = segments.reduce((s,x) => s+x.v, 0) || 1;
-  const r = 24, cx = 32, cy = 32, stroke = 10;
-  const circumference = 2 * Math.PI * r;
-  let offset = 0;
-  return segments.map(({v, c}) => {
-    const dash = (v / total) * circumference;
-    const gap = circumference - dash;
-    const el = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-width="${stroke}"
-      stroke-dasharray="${dash} ${gap}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+  var total = segments.reduce(function(s,x){ return s+x.v; }, 0) || 1;
+  var r = 24, cx = 32, cy = 32, strokeW = 10;
+  var circumference = 2 * Math.PI * r;
+  var offset = 0;
+  return segments.map(function(seg) {
+    var v = seg.v, clr = seg.c;
+    var dash = (v / total) * circumference;
+    var gap = circumference - dash;
+    var el = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + clr + '" stroke-width="' + strokeW + '"'
+      + ' stroke-dasharray="' + dash + ' ' + gap + '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>';
     offset += dash;
     return el;
   }).join('');
@@ -4559,6 +4754,8 @@ function printLastReceipt() {
   printReceipt(c.id, c.payments.length - 1);
 }
 
+window.copyPayRef = copyPayRef;
+window.filterPayHistory = filterPayHistory;
 window.printReceipt = printReceipt;
 window.printLastReceipt = printLastReceipt;
 window.enableNotifications = enableNotifications;
