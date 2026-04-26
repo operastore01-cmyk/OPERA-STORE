@@ -387,7 +387,8 @@ select option { background:var(--surface2); }
 @media(min-width:601px){
   .modal-panel { height:88vh; border-radius:26px; border:1px solid var(--border2); }
 }
-#settle-modal .modal-panel, #add-savings-modal .modal-panel, #user-credentials-modal .modal-panel, #staff-modal .modal-panel, #add-staff-modal .modal-panel { height:auto; max-width:420px; border-radius:26px; }
+#add-savings-modal .modal-panel, #user-credentials-modal .modal-panel, #staff-modal .modal-panel, #add-staff-modal .modal-panel { height:auto; max-width:420px; border-radius:26px; }
+#settle-modal .modal-panel { max-width:480px; max-height:90vh; height:auto; border-radius:26px; overflow-y:auto; }
 
 .back-btn {
   display:flex; align-items:center; gap:6px; color:var(--muted);
@@ -1279,8 +1280,11 @@ input, textarea, select { font-size: 0.88rem !important; }
 <!-- ===== SETTLE MODAL ===== -->
 <div class="modal-overlay" id="settle-modal">
   <div class="modal-panel">
-    <div class="back-btn" onclick="closeM('settle-modal')">إلغاء</div>
-    <div class="modal-title">🤝 حاسبة السداد المبكر</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="back-btn" style="margin-bottom:0" onclick="closeM('settle-modal')">رجوع</div>
+      <button onclick="closeM('settle-modal')" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div class="modal-title" style="margin-bottom:14px">🤝 حاسبة السداد المبكر</div>
 
     <!-- بيانات العميل (للعرض فقط) -->
     <div id="settle-info-bar" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:0.72rem;color:var(--muted);line-height:1.9"></div>
