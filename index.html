@@ -1274,6 +1274,22 @@ input, textarea, select { font-size: 0.88rem !important; }
         <label style="font-size:0.7rem;font-weight:700;display:block;margin-bottom:5px">وصف المنتج</label>
         <textarea id="spf-desc" rows="3" placeholder="وصف مختصر للمنتج..." style="width:100%;padding:10px;background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:'Cairo',sans-serif;font-size:0.82rem;outline:none;resize:vertical;line-height:1.6"></textarea>
       </div>
+
+      <!-- مواصفات تفصيلية -->
+      <div style="margin-bottom:12px">
+        <div style="font-size:0.7rem;font-weight:700;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
+          <span>📋 مواصفات تفصيلية</span>
+          <button type="button" onclick="addSpecRow()" style="padding:3px 10px;background:rgba(124,107,255,0.15);border:1px solid rgba(124,107,255,0.3);border-radius:8px;color:var(--accent2);font-family:'Cairo',sans-serif;font-weight:700;font-size:0.68rem;cursor:pointer">+ إضافة مواصفة</button>
+        </div>
+        <div id="spf-specs-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
+      <!-- رابط الشراء الفوري -->
+      <div style="margin-bottom:12px">
+        <label style="font-size:0.7rem;font-weight:700;display:block;margin-bottom:5px">🛒 رابط الشراء الفوري (اختياري)</label>
+        <input type="url" id="spf-buy-url" placeholder="https://..." style="width:100%;padding:10px;background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:'Cairo',sans-serif;font-size:0.82rem;outline:none">
+        <div style="font-size:0.62rem;color:var(--muted);margin-top:4px">لو فضيته فاضي هيظهر زر "اطلب بالتقسيط" فقط</div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <button onclick="cancelProductForm()" style="padding:11px;background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius);color:var(--muted);font-family:'Cairo',sans-serif;font-weight:700;font-size:0.85rem;cursor:pointer">إلغاء</button>
         <button onclick="saveStoreProduct()" style="padding:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--radius);color:#fff;font-family:'Cairo',sans-serif;font-weight:800;font-size:0.85rem;cursor:pointer">💾 حفظ المنتج</button>
@@ -3236,7 +3252,7 @@ function migrateCustCodes() {
 }
 
 // ===== PRINT RECEIPT =====
-function printReceipt(custId, payIdx) {
+async function printReceipt(custId, payIdx) {
   const c = customers.find(x => x.id === custId);
   if(!c) return;
   const p = payIdx !== undefined ? c.payments[payIdx] : c.payments[c.payments.length-1];
@@ -3245,51 +3261,81 @@ function printReceipt(custId, payIdx) {
   const itc = c.total - c.down - ed;
   const paid = c.payments.reduce((s,x)=>s+x.amount,0);
   const rem = Math.max(0, itc - paid);
-  const win = window.open('','_blank','width=400,height=600');
-  win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head>
-  <meta charset="UTF-8"><title>إيصال دفع</title>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Segoe UI',Tahoma,Arial,sans-serif; padding:20px; color:#1a1a2e; background:#fff; width:320px; margin:0 auto; }
-    .logo { text-align:center; padding:12px 0 8px; border-bottom:2px dashed #7c6bff; margin-bottom:14px; }
-    .logo h2 { font-size:20px; color:#7c6bff; letter-spacing:0.1em; }
-    .logo p { font-size:11px; color:#888; margin-top:3px; }
-    .ref-badge { background:#f0f0ff; border:1px solid #d0c8ff; border-radius:8px; padding:6px 12px; text-align:center; margin-bottom:14px; font-size:11px; color:#7c6bff; font-weight:700; }
-    .row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f0f0f8; font-size:13px; }
-    .row:last-child { border:none; }
-    .row .lbl { color:#888; }
-    .row .val { font-weight:700; }
-    .amount-box { background:#f0fff4; border:1px solid #86efac; border-radius:10px; padding:14px; text-align:center; margin:14px 0; }
-    .amount-box .lbl { font-size:11px; color:#16a34a; }
-    .amount-box .val { font-size:26px; font-weight:900; color:#16a34a; }
-    .footer { text-align:center; font-size:10px; color:#aaa; margin-top:14px; line-height:1.8; }
-    .print-btn { width:100%; background:#7c6bff; color:#fff; border:none; border-radius:8px; padding:10px; font-size:14px; cursor:pointer; margin-top:14px; font-family:inherit; }
-    @media print { .print-btn { display:none; } }
-  </style></head><body>
-  <div class="logo">
-    <h2 style="display:flex;align-items:center;justify-content:center;gap:8px"><img src="https://www.image2url.com/r2/default/images/1776870433523-562e3357-be93-428f-8cee-feb67e58c10d.png" alt="OPERA" style="height:28px;width:28px;object-fit:contain;border-radius:6px"> OPERA STORE</h2>
-    <p>إيصال دفع رسمي</p>
-  </div>
-  <div class="ref-badge">🔢 رقم العملية: <strong>${p.ref || '--'}</strong></div>
-  <div class="row"><span class="lbl">اسم العميل</span><span class="val">${c.name}</span></div>
-  <div class="row"><span class="lbl">كود العميل (ID)</span><span class="val">ID ${c.custCode||'--'}</span></div>
-  <div class="row"><span class="lbl">المنتج</span><span class="val">${c.prod||'--'}</span></div>
-  <div class="row"><span class="lbl">تاريخ الدفع</span><span class="val">${p.date}</span></div>
-  <div class="row"><span class="lbl">البيان</span><span class="val">${p.note||'قسط شهري'}</span></div>
-  ${p.by ? `<div class="row"><span class="lbl">سجّله</span><span class="val">${p.by}</span></div>` : ''}
-  <div class="amount-box">
-    <div class="lbl">المبلغ المدفوع</div>
-    <div class="val">${fmt(p.amount)} ج.م</div>
-  </div>
-  <div class="row"><span class="lbl">إجمالي المدفوع</span><span class="val" style="color:#16a34a">${fmt(paid)} ج.م</span></div>
-  <div class="row"><span class="lbl">المتبقي</span><span class="val" style="color:#dc2626">${fmt(rem)} ج.م</span></div>
-  <div class="footer">
-    OPERA STORE — للتواصل: 01009144655<br>
-    ${new Date().toLocaleDateString('ar-EG')} — ${new Date().toLocaleTimeString('ar-EG')}
-  </div>
-  <button class="print-btn" onclick="window.print()">🖨️ طباعة الإيصال</button>
-  </body></html>`);
-  win.document.close();
+  const now = new Date();
+  const ts = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} — ${now.toLocaleTimeString('ar-EG')}`;
+
+  // إنشاء div الإيصال مؤقتاً
+  const div = document.createElement('div');
+  div.id = 'receipt-render';
+  div.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:320px;background:#fff;font-family:Cairo,Tahoma,Arial,sans-serif;direction:rtl;padding:20px;border-radius:16px;color:#1a1a2e';
+  div.innerHTML = `
+    <div style="text-align:center;padding-bottom:14px;border-bottom:2px dashed #7c6bff;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px">
+        <img src="https://www.image2url.com/r2/default/images/1776870433523-562e3357-be93-428f-8cee-feb67e58c10d.png" style="height:28px;width:28px;object-fit:contain;border-radius:6px">
+        <span style="font-size:20px;font-weight:900;color:#7c6bff;letter-spacing:.05em">OPERA STORE</span>
+      </div>
+      <div style="font-size:11px;color:#888">إيصال دفع رسمي</div>
+    </div>
+    <div style="background:#f0f0ff;border:1px solid #d0c8ff;border-radius:8px;padding:7px 12px;text-align:center;margin-bottom:14px;font-size:11px;color:#7c6bff;font-weight:700">🔢 رقم العملية: <strong>${p.ref||'--'}</strong></div>
+    ${[
+      ['اسم العميل', c.name],
+      ['كود العميل', 'ID '+(c.custCode||'--')],
+      ['المنتج', c.prod||'--'],
+      ['تاريخ الدفع', p.date],
+      ['البيان', p.note||'قسط شهري'],
+      p.by ? ['سجّله', p.by] : null,
+    ].filter(Boolean).map(([l,v])=>`
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f8;font-size:13px">
+        <span style="color:#888">${l}</span><span style="font-weight:700">${v}</span>
+      </div>`).join('')}
+    <div style="background:#f0fff4;border:1px solid #86efac;border-radius:10px;padding:14px;text-align:center;margin:14px 0">
+      <div style="font-size:11px;color:#16a34a;margin-bottom:4px">المبلغ المدفوع</div>
+      <div style="font-size:28px;font-weight:900;color:#16a34a">${fmt(p.amount)} ج.م</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f8;font-size:13px">
+      <span style="color:#888">إجمالي المدفوع</span><span style="font-weight:700;color:#16a34a">${fmt(paid)} ج.م</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px">
+      <span style="color:#888">المتبقي</span><span style="font-weight:700;color:#dc2626">${fmt(rem)} ج.م</span>
+    </div>
+    <div style="text-align:center;font-size:10px;color:#aaa;margin-top:14px;line-height:1.9;border-top:1px dashed #e0e0f0;padding-top:10px">
+      OPERA STORE — للتواصل: 01009144655<br>${ts}
+    </div>`;
+  document.body.appendChild(div);
+
+  try {
+    // تحميل html2canvas لو مش محمل
+    if(!window.html2canvas) {
+      await new Promise((res,rej)=>{
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const canvas = await html2canvas(div, {scale:2, backgroundColor:'#ffffff', useCORS:true, logging:false});
+    document.body.removeChild(div);
+
+    canvas.toBlob(async blob => {
+      const file = new File([blob], `receipt_${c.custCode||c.id}_${p.ref||Date.now()}.png`, {type:'image/png'});
+      // Web Share API (موبايل)
+      if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+        try {
+          await navigator.share({ files:[file], title:'إيصال OPERA STORE', text:`إيصال دفع — ${c.name}` });
+          return;
+        } catch(e) { /* user cancelled or not supported */ }
+      }
+      // fallback: تحميل كصورة
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = file.name; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url), 3000);
+    }, 'image/png');
+  } catch(e) {
+    if(document.getElementById('receipt-render')) document.body.removeChild(div);
+    console.error('Receipt error:', e);
+    showToast('❌ فشل إنشاء الإيصال', 'error');
+  }
 }
 
 // ===== SMART NOTIFICATIONS (تذكيرات ذكية) =====
@@ -4859,6 +4905,8 @@ window.openAddProductForm = function() {
   document.getElementById('spf-img-preview').style.display = 'none';
   document.getElementById('spf-img-label-txt').textContent = 'اختار صورة للمنتج';
   document.getElementById('spf-upload-progress').style.display = 'none';
+  document.getElementById('spf-buy-url').value = '';
+  document.getElementById('spf-specs-list').innerHTML = '';
   document.getElementById('store-product-form').style.display = 'block';
   document.getElementById('store-product-form').scrollIntoView({behavior:'smooth'});
 };
@@ -4878,6 +4926,11 @@ window.editStoreProduct = function(i) {
   document.getElementById('spf-img-url').value = p.img || '';
   document.getElementById('spf-img-input').value = '';
   document.getElementById('spf-upload-progress').style.display = 'none';
+  document.getElementById('spf-buy-url').value = p.buyUrl || '';
+  // load specs
+  const specsList = document.getElementById('spf-specs-list');
+  specsList.innerHTML = '';
+  (p.specs||[]).forEach(s => addSpecRow(s.key, s.val));
   // show existing image preview
   if(p.img) {
     document.getElementById('spf-img-preview-el').src = p.img;
@@ -4926,6 +4979,17 @@ async function uploadProductImage(file) {
   return data.data.url;
 }
 
+window.addSpecRow = function(key='', val='') {
+  const list = document.getElementById('spf-specs-list');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 28px;gap:6px;align-items:center';
+  row.innerHTML = `
+    <input type="text" placeholder="مثال: الشاشة" value="${key}" style="padding:8px;background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:'Cairo',sans-serif;font-size:0.78rem;outline:none">
+    <input type="text" placeholder="مثال: 6.7 بوصة" value="${val}" style="padding:8px;background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:'Cairo',sans-serif;font-size:0.78rem;outline:none">
+    <button type="button" onclick="this.parentElement.remove()" style="width:28px;height:28px;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);border-radius:6px;color:var(--red);cursor:pointer;font-size:0.75rem;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-xmark"></i></button>`;
+  list.appendChild(row);
+};
+
 window.saveStoreProduct = async function() {
   const name  = document.getElementById('spf-name').value.trim();
   const price = parseFloat(document.getElementById('spf-price').value);
@@ -4949,6 +5013,15 @@ window.saveStoreProduct = async function() {
     }
   }
 
+  // جمع المواصفات
+  const specs = [];
+  document.querySelectorAll('#spf-specs-list > div').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const k = inputs[0]?.value.trim();
+    const v = inputs[1]?.value.trim();
+    if(k && v) specs.push({key:k, val:v});
+  });
+
   const product = {
     id: productId,
     name,
@@ -4959,6 +5032,8 @@ window.saveStoreProduct = async function() {
     badge:    document.getElementById('spf-badge').value || null,
     desc:     document.getElementById('spf-desc').value.trim(),
     img:      imgUrl,
+    specs:    specs.length ? specs : null,
+    buyUrl:   document.getElementById('spf-buy-url').value.trim() || null,
   };
 
   const idxVal = document.getElementById('spf-id').value;
