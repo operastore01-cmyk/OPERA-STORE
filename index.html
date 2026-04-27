@@ -1986,7 +1986,12 @@ window.loadAllFromFirebase = async function() {
   }
 };
 
-document.addEventListener('DOMContentLoaded', () => window.loadAllFromFirebase());
+document.addEventListener('DOMContentLoaded', () => {
+  window.loadAllFromFirebase();
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  document.head.appendChild(s);
+});
 
 // expose Firebase to non-module scripts
 window._db = db;
@@ -3047,8 +3052,11 @@ function sendWA(phone,name,amount,rem,ref='') {
     showToast('ليس لديك صلاحية لإرسال رسائل', 'error', 'fa-lock');
     return;
   }
-  const refLine = ref ? `%0Aرقم العملية: %23${ref}` : '';
-  window.open(`https://wa.me/2${phone}?text=OPERA STORE%0Aإيصال قسط%0Aالعميل: ${name}%0Aتم استلام: ${fmt(amount)} ج.م%0Aالمتبقي: ${fmt(rem)} ج.م${refLine}%0A-------------------------%0Aللتواصل: 01009144655%0Aشكراً لتعاملكم معنا.`,'_blank');
+  const today = new Date();
+  const dateStr = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
+  const refLine = ref ? `%0Aرقم العملية: ${ref}` : '';
+  const msg = `OPERA STORE%0Aإيصال استلام قسط${refLine}%0A------------------------------%0Aالتاريخ: ${dateStr}%0Aالعميل: ${name}%0Aتم استلام مبلغ: ${fmt(amount)} ج.م%0Aالمبلغ المتبقي: ${fmt(rem)} ج.م%0A-------------------------------%0Aللتواصل: 01009144655 - 01500041020%0Aشكراً لتعاملكم معنا.`;
+  window.open(`https://wa.me/2${phone}?text=${msg}`,'_blank');
 }
 
 function deleteCust(id) {
@@ -3263,10 +3271,7 @@ async function printReceipt(custId, payIdx) {
   const rem = Math.max(0, itc - paid);
   const now = new Date();
   const ts = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} — ${now.toLocaleTimeString('ar-EG')}`;
-
-  // إنشاء div الإيصال مؤقتاً
   const div = document.createElement('div');
-  div.id = 'receipt-render';
   div.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:320px;background:#fff;font-family:Cairo,Tahoma,Arial,sans-serif;direction:rtl;padding:20px;border-radius:16px;color:#1a1a2e';
   div.innerHTML = `
     <div style="text-align:center;padding-bottom:14px;border-bottom:2px dashed #7c6bff;margin-bottom:14px">
@@ -3302,38 +3307,21 @@ async function printReceipt(custId, payIdx) {
       OPERA STORE — للتواصل: 01009144655<br>${ts}
     </div>`;
   document.body.appendChild(div);
-
   try {
-    // تحميل html2canvas لو مش محمل
-    if(!window.html2canvas) {
-      await new Promise((res,rej)=>{
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        s.onload = res; s.onerror = rej;
-        document.head.appendChild(s);
-      });
-    }
+    if(!window.html2canvas) await new Promise(r=>setTimeout(r,500));
     const canvas = await html2canvas(div, {scale:2, backgroundColor:'#ffffff', useCORS:true, logging:false});
     document.body.removeChild(div);
-
     canvas.toBlob(async blob => {
       const file = new File([blob], `receipt_${c.custCode||c.id}_${p.ref||Date.now()}.png`, {type:'image/png'});
-      // Web Share API (موبايل)
       if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
-        try {
-          await navigator.share({ files:[file], title:'إيصال OPERA STORE', text:`إيصال دفع — ${c.name}` });
-          return;
-        } catch(e) { /* user cancelled or not supported */ }
+        try { await navigator.share({files:[file], title:'إيصال OPERA STORE', text:`إيصال دفع — ${c.name}`}); return; } catch(e){}
       }
-      // fallback: تحميل كصورة
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = file.name; a.click();
+      const a = document.createElement('a'); a.href=url; a.download=file.name; a.click();
       setTimeout(()=>URL.revokeObjectURL(url), 3000);
     }, 'image/png');
   } catch(e) {
-    if(document.getElementById('receipt-render')) document.body.removeChild(div);
-    console.error('Receipt error:', e);
+    if(div.parentNode) document.body.removeChild(div);
     showToast('❌ فشل إنشاء الإيصال', 'error');
   }
 }
