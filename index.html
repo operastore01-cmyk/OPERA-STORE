@@ -1254,6 +1254,24 @@ input, textarea, select { font-size: 0.88rem !important; }
         </div>
       </div>
       <div style="margin-bottom:12px">
+        <label style="font-size:0.7rem;font-weight:700;display:block;margin-bottom:5px">صورة المنتج</label>
+        <div id="spf-img-preview" style="display:none;margin-bottom:8px;border-radius:10px;overflow:hidden;max-height:160px;background:var(--surface3);text-align:center">
+          <img id="spf-img-preview-el" style="max-height:160px;max-width:100%;object-fit:contain">
+        </div>
+        <label for="spf-img-input" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:var(--surface3);border:1.5px dashed var(--border2);border-radius:var(--radius);cursor:pointer;font-size:0.8rem;font-weight:700;color:var(--accent2);transition:all 0.2s" id="spf-img-label">
+          <i class="fa-solid fa-image"></i> <span id="spf-img-label-txt">اختار صورة للمنتج</span>
+        </label>
+        <input type="file" id="spf-img-input" accept="image/*" style="display:none" onchange="previewProductImage(this)">
+        <input type="hidden" id="spf-img-url">
+        <!-- Progress bar -->
+        <div id="spf-upload-progress" style="display:none;margin-top:8px">
+          <div style="height:4px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden">
+            <div id="spf-progress-bar" style="height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width 0.3s;border-radius:4px"></div>
+          </div>
+          <div id="spf-progress-txt" style="font-size:0.65rem;color:var(--muted);margin-top:4px;text-align:center">جاري الرفع...</div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
         <label style="font-size:0.7rem;font-weight:700;display:block;margin-bottom:5px">وصف المنتج</label>
         <textarea id="spf-desc" rows="3" placeholder="وصف مختصر للمنتج..." style="width:100%;padding:10px;background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:'Cairo',sans-serif;font-size:0.82rem;outline:none;resize:vertical;line-height:1.6"></textarea>
       </div>
@@ -1709,7 +1727,7 @@ input, textarea, select { font-size: 0.88rem !important; }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 const firebaseConfig = {
   apiKey: "AIzaSyCUi3kogTKbON6HyKNXmIrgtyAVoI9h0t0",
   authDomain: "opera-store-7e04d.firebaseapp.com",
@@ -1721,6 +1739,7 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+const storage = getStorage(fbApp);
 
 // ===== حفظ على Firebase + localStorage =====
 window.fbSave = async function(key, data) {
@@ -1885,6 +1904,17 @@ window.loadAllFromFirebase = async function() {
 };
 
 document.addEventListener('DOMContentLoaded', () => window.loadAllFromFirebase());
+
+// expose Firebase to non-module scripts
+window._db = db;
+window._setDoc = setDoc;
+window._getDoc = getDoc;
+window._doc = doc;
+window._storage = storage;
+window._ref = ref;
+window._uploadBytesResumable = uploadBytesResumable;
+window._getDownloadURL = getDownloadURL;
+window._deleteObject = deleteObject;
 </script>
 
 <script>
@@ -4737,7 +4767,7 @@ window._storeProducts = [];
 
 async function loadStoreProducts() {
   try {
-    const snap = await getDoc(doc(db, "opera_store", "store_products"));
+    const snap = await window._getDoc(window._doc(window._db, "opera_store", "store_products"));
     if(snap.exists()) {
       window._storeProducts = JSON.parse(snap.data().value);
     }
@@ -4747,7 +4777,7 @@ async function loadStoreProducts() {
 
 async function saveStoreProducts(products) {
   try {
-    await setDoc(doc(db, "opera_store", "store_products"), { value: JSON.stringify(products) });
+    await window._setDoc(window._doc(window._db, "opera_store", "store_products"), { value: JSON.stringify(products) });
     window._storeProducts = products;
   } catch(e) { console.error('saveStoreProducts error:', e); }
 }
@@ -4756,6 +4786,13 @@ window.openStoreManager = async function() {
   openM('store-manager-modal');
   document.getElementById('store-admin-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:0.8rem">⏳ جاري التحميل...</div>';
   cancelProductForm();
+  // wait for Firebase to be ready
+  let tries = 0;
+  while(!window._db && tries < 20) { await new Promise(r=>setTimeout(r,200)); tries++; }
+  if(!window._db) {
+    document.getElementById('store-admin-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--red);font-size:0.8rem">❌ خطأ في الاتصال بالسيرفر</div>';
+    return;
+  }
   await loadStoreProducts();
   renderStoreAdminList();
 };
@@ -4770,7 +4807,11 @@ function renderStoreAdminList() {
   const fmt = n => Number(n||0).toLocaleString('en-US');
   list.innerHTML = prods.map((p,i) => `
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
-      <div style="font-size:2rem;width:44px;text-align:center;flex-shrink:0">${p.emoji||'📦'}</div>
+      <div style="width:52px;height:52px;border-radius:10px;overflow:hidden;flex-shrink:0;background:var(--surface3);display:flex;align-items:center;justify-content:center">
+        ${p.img
+          ? `<img src="${p.img}" style="width:100%;height:100%;object-fit:cover">`
+          : `<span style="font-size:1.8rem">${p.emoji||'📦'}</span>`}
+      </div>
       <div style="flex:1;min-width:0">
         <div style="font-size:0.85rem;font-weight:800;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
         <div style="font-size:0.68rem;color:var(--muted)">${CAT_LABELS[p.cat]||p.cat} ${p.badge ? '· <span style="color:var(--green)">'+p.badge+'</span>' : ''}</div>
@@ -4794,6 +4835,11 @@ window.openAddProductForm = function() {
   document.getElementById('spf-emoji').value = '📱';
   document.getElementById('spf-badge').value = '';
   document.getElementById('spf-desc').value = '';
+  document.getElementById('spf-img-url').value = '';
+  document.getElementById('spf-img-input').value = '';
+  document.getElementById('spf-img-preview').style.display = 'none';
+  document.getElementById('spf-img-label-txt').textContent = 'اختار صورة للمنتج';
+  document.getElementById('spf-upload-progress').style.display = 'none';
   document.getElementById('store-product-form').style.display = 'block';
   document.getElementById('store-product-form').scrollIntoView({behavior:'smooth'});
 };
@@ -4810,16 +4856,82 @@ window.editStoreProduct = function(i) {
   document.getElementById('spf-emoji').value = p.emoji || '📦';
   document.getElementById('spf-badge').value = p.badge || '';
   document.getElementById('spf-desc').value = p.desc || '';
+  document.getElementById('spf-img-url').value = p.img || '';
+  document.getElementById('spf-img-input').value = '';
+  document.getElementById('spf-upload-progress').style.display = 'none';
+  // show existing image preview
+  if(p.img) {
+    document.getElementById('spf-img-preview-el').src = p.img;
+    document.getElementById('spf-img-preview').style.display = 'block';
+    document.getElementById('spf-img-label-txt').textContent = 'تغيير الصورة';
+  } else {
+    document.getElementById('spf-img-preview').style.display = 'none';
+    document.getElementById('spf-img-label-txt').textContent = 'اختار صورة للمنتج';
+  }
   document.getElementById('store-product-form').style.display = 'block';
   document.getElementById('store-product-form').scrollIntoView({behavior:'smooth'});
 };
+
+window.previewProductImage = function(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('spf-img-preview-el').src = e.target.result;
+    document.getElementById('spf-img-preview').style.display = 'block';
+    document.getElementById('spf-img-label-txt').textContent = file.name;
+  };
+  reader.readAsDataURL(file);
+};
+
+async function uploadProductImage(file) {
+  const IMGBB_KEY = 'bf1400fd6d4f8ac6e00e0a07e4d02ad0';
+  const formData = new FormData();
+  formData.append('image', file);
+
+  document.getElementById('spf-upload-progress').style.display = 'block';
+  document.getElementById('spf-progress-bar').style.width = '30%';
+  document.getElementById('spf-progress-txt').textContent = 'جاري الرفع على ImgBB...';
+
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, {
+    method: 'POST',
+    body: formData
+  });
+  const data = await res.json();
+
+  if(!data.success) throw new Error(data.error?.message || 'فشل الرفع');
+
+  document.getElementById('spf-progress-bar').style.width = '100%';
+  document.getElementById('spf-progress-txt').textContent = '✅ تم الرفع';
+
+  return data.data.url;
+}
 
 window.saveStoreProduct = async function() {
   const name  = document.getElementById('spf-name').value.trim();
   const price = parseFloat(document.getElementById('spf-price').value);
   if(!name || !price) { alert('اسم المنتج والسعر مطلوبان'); return; }
+
+  const saveBtn = document.querySelector('#store-product-form button[onclick="saveStoreProduct()"]');
+  if(saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ جاري الحفظ...'; }
+
+  const productId = 'p' + Date.now();
+  let imgUrl = document.getElementById('spf-img-url').value || null;
+
+  // upload new image if selected
+  const imgFile = document.getElementById('spf-img-input').files[0];
+  if(imgFile) {
+    try {
+      imgUrl = await uploadProductImage(imgFile);
+    } catch(e) {
+      alert('فشل رفع الصورة — تأكد من الاتصال بالنت');
+      if(saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 حفظ المنتج'; }
+      return;
+    }
+  }
+
   const product = {
-    id: 'p' + Date.now(),
+    id: productId,
     name,
     cat:      document.getElementById('spf-cat').value,
     price,
@@ -4827,7 +4939,9 @@ window.saveStoreProduct = async function() {
     emoji:    document.getElementById('spf-emoji').value.trim() || '📦',
     badge:    document.getElementById('spf-badge').value || null,
     desc:     document.getElementById('spf-desc').value.trim(),
+    img:      imgUrl,
   };
+
   const idxVal = document.getElementById('spf-id').value;
   let prods = [...window._storeProducts];
   if(idxVal !== '') {
@@ -4839,7 +4953,7 @@ window.saveStoreProduct = async function() {
   await saveStoreProducts(prods);
   cancelProductForm();
   renderStoreAdminList();
-  // toast
+  if(saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 حفظ المنتج'; }
   if(window.showToast) showToast('✅ تم حفظ المنتج', 'success');
 };
 
