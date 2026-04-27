@@ -716,6 +716,48 @@ body[data-theme="light"] .bottom-nav {
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:10px; }
 
+/* ===== INSTALLMENT CALCULATOR ===== */
+.ic-input-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.ic-input-full { margin-bottom:12px; }
+.ic-duration-btns { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
+.ic-btn-opt {
+  background:var(--surface3); border:1px solid var(--border);
+  color:var(--text); padding:12px; border-radius:var(--radius);
+  font-weight:700; font-family:'Cairo',sans-serif; cursor:pointer;
+  transition:0.2s; font-size:0.9rem;
+}
+.ic-btn-opt:hover { border-color:var(--accent); color:var(--accent2); }
+.ic-btn-opt.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.ic-manual-row { grid-column:span 3; display:flex; gap:8px; margin-top:8px; }
+.ic-res-box {
+  background:linear-gradient(135deg,rgba(124,107,255,0.08),rgba(52,211,153,0.04));
+  border:1px solid rgba(124,107,255,0.2); border-radius:var(--radius2);
+  padding:18px; text-align:center; display:none;
+  animation:popIn 0.3s ease;
+}
+.ic-mon-val { font-size:2.8rem; font-weight:900; color:var(--green); font-family:Arial; }
+.ic-mon-lbl { font-size:0.72rem; color:var(--muted); margin-bottom:6px; }
+.ic-weekly-box {
+  background:rgba(52,211,153,0.06); border:1px solid rgba(52,211,153,0.15);
+  border-radius:var(--radius); padding:8px; margin:10px 0;
+}
+.ic-detail-line { display:flex; justify-content:space-between; font-size:0.82rem; padding:4px 0; }
+.ic-detail-line span { color:var(--muted); }
+.ic-detail-line b { color:var(--text); font-family:Arial; }
+.ic-action-bar { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+.ic-arch-item {
+  background:var(--surface2); border:1px solid var(--border);
+  border-right:3px solid var(--accent); border-radius:var(--radius);
+  padding:10px 12px; margin-bottom:6px; cursor:pointer;
+  transition:all 0.2s;
+}
+.ic-arch-item:hover { border-color:var(--accent2); background:var(--surface3); }
+.ic-arch-item small { font-size:0.6rem; color:var(--muted); display:block; }
+.ic-arch-item .ic-arch-name { font-weight:700; font-size:0.88rem; }
+.ic-arch-item .ic-arch-prod { font-size:0.72rem; color:var(--accent2); }
+.ic-arch-item .ic-arch-inst { font-size:0.78rem; color:var(--green); font-weight:700; margin-top:4px; border-top:1px solid var(--border); padding-top:4px; }
+.ic-settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+
 /* ===== ANIMATIONS ===== */
 @keyframes fadeDown { from{opacity:0;transform:translateY(-14px)} to{opacity:1;transform:translateY(0)} }
 @keyframes fadeUp   { from{opacity:0;transform:translateY(14px)}  to{opacity:1;transform:translateY(0)} }
@@ -949,6 +991,9 @@ input, textarea, select { font-size: 0.88rem !important; }
 
     <!-- قسم: المالية والحسابات -->
     <div class="menu-section-label">💰 المالية والحسابات</div>
+    <button class="menu-btn" onclick="closeM('menu-modal');openInstCalc()">
+      <i class="fa-solid fa-calculator" style="color:var(--accent2)"></i> حاسبة الأقساط
+    </button>
     <button class="menu-btn" onclick="openSavingsModal()">
       <i class="fa-solid fa-piggy-bank" style="color:var(--pink)"></i> حسابات تحويش
       <span id="savings-badge" class="badge" style="background:rgba(244,114,182,0.15);color:var(--pink)"></span>
@@ -1656,6 +1701,124 @@ input, textarea, select { font-size: 0.88rem !important; }
 </div>
 </div> <!-- end dashboard-main -->
 
+<!-- ===== INSTALLMENT CALCULATOR MODAL ===== -->
+<div class="modal-overlay" id="inst-calc-modal">
+  <div class="modal-panel">
+    <div class="back-btn" onclick="closeM('inst-calc-modal')">رجوع</div>
+    <div class="modal-title"><i class="fa-solid fa-calculator" style="color:var(--accent2)"></i> حاسبة الأقساط</div>
+
+    <div class="ic-input-row">
+      <div>
+        <label>اسم العميل</label>
+        <input type="text" id="ic-cust-name" placeholder="الاسم">
+      </div>
+      <div>
+        <label>نوع المنتج</label>
+        <input type="text" id="ic-prod-type" placeholder="الجهاز">
+      </div>
+    </div>
+    <div class="ic-input-row">
+      <div>
+        <label>المبلغ الأساسي</label>
+        <input type="number" id="ic-base-price" placeholder="0" oninput="icCheckQuickCalc()">
+      </div>
+      <div>
+        <label>المقدم</label>
+        <input type="number" id="ic-upfront" placeholder="0" oninput="icCheckQuickCalc()">
+      </div>
+    </div>
+
+    <label style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;display:block">مدة التقسيط / القسط المستهدف</label>
+    <div class="ic-duration-btns">
+      <button class="ic-btn-opt" id="ic-btn-3" onclick="icRunCalc(3)">3</button>
+      <button class="ic-btn-opt" id="ic-btn-6" onclick="icRunCalc(6)">6</button>
+      <button class="ic-btn-opt" id="ic-btn-12" onclick="icRunCalc(12)">12</button>
+      <div class="ic-manual-row">
+        <input type="number" id="ic-manual-months" placeholder="شهور" style="flex:1;min-height:42px">
+        <input type="number" id="ic-target-inst" placeholder="قسط مستهدف" style="flex:1;min-height:42px">
+        <button class="chip-btn accent" style="flex-shrink:0;font-size:0.75rem" onclick="icRunManual()">حساب</button>
+      </div>
+    </div>
+
+    <!-- نتيجة الحساب -->
+    <div class="ic-res-box" id="ic-res-box" style="margin-top:14px">
+      <div class="ic-mon-lbl" id="ic-res-title">قسط 0 شهر</div>
+      <div class="ic-mon-val" id="ic-mon-val">0</div>
+      <div style="font-size:0.7rem;color:var(--muted)">جنيه مصري شهرياً</div>
+      <div class="ic-weekly-box">
+        <div style="font-size:0.68rem;color:var(--muted)">أو قسط أسبوعي بقيمة:</div>
+        <div style="font-size:1.4rem;font-weight:900;color:var(--green);font-family:Arial" id="ic-week-val">0</div>
+        <div style="font-size:0.6rem;color:var(--muted)">جنيه كل أسبوع</div>
+      </div>
+      <div style="border-top:1px dashed var(--border);margin-top:10px;padding-top:10px">
+        <div class="ic-detail-line"><span>مجموع الأقساط:</span><b id="ic-total-inst">0</b></div>
+        <div class="ic-detail-line"><span>الإجمالي (بالمقدم):</span><b id="ic-full-price" style="color:var(--accent2)">0</b></div>
+      </div>
+      <div class="ic-action-bar">
+        <button class="chip-btn" style="background:var(--red);color:#fff;border-color:var(--red);flex-shrink:0" onclick="icReset()"><i class="fa-solid fa-xmark"></i></button>
+        <button class="chip-btn" style="background:#25D366;color:#fff;border-color:#25D366;flex:1;font-size:0.78rem" onclick="icSendCustomer()"><i class="fa-brands fa-whatsapp"></i> للعميل</button>
+        <button class="chip-btn" style="background:var(--accent);color:#fff;border-color:var(--accent);flex:1;font-size:0.78rem" onclick="icCopyPrint()"><i class="fa-solid fa-copy"></i> نسخ</button>
+        <button class="chip-btn" style="background:var(--orange);color:#fff;border-color:var(--orange);flex:1;font-size:0.78rem" onclick="icSendSelf()"><i class="fa-solid fa-paper-plane"></i> لنفسي</button>
+        <button class="chip-btn" style="background:#eab308;color:#000;border-color:#eab308;flex-shrink:0;font-weight:900" onclick="icShowProfit()">$</button>
+      </div>
+    </div>
+
+    <!-- أزرار الأرشيف والسيستم -->
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="chip-btn" style="flex:1;font-size:0.78rem" onclick="icShowArchive()">
+        <i class="fa-solid fa-box-archive" style="color:var(--accent2)"></i> الأرشيف
+        <span id="ic-arch-count" style="background:rgba(124,107,255,0.15);color:var(--accent2);border-radius:10px;padding:1px 7px;font-size:0.65rem;margin-right:4px"></span>
+      </button>
+      <button class="chip-btn" style="flex:1;font-size:0.78rem" onclick="icShowSettings()">
+        <i class="fa-solid fa-sliders" style="color:var(--muted)"></i> السيستم
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- أرشيف الحاسبة -->
+<div class="modal-overlay" id="ic-archive-modal">
+  <div class="modal-panel">
+    <div class="back-btn" onclick="closeM('ic-archive-modal')">رجوع</div>
+    <div class="modal-title"><i class="fa-solid fa-box-archive" style="color:var(--accent2)"></i> أرشيف الحسابات <span style="font-size:0.7rem;color:var(--muted)">(آخر 60)</span></div>
+    <input type="text" id="ic-arch-search" placeholder="بحث بالاسم أو المنتج..." oninput="icFilterArchive()" style="margin-bottom:12px">
+    <div id="ic-arch-content"></div>
+    <button onclick="icClearArchive()" style="margin-top:14px;width:100%;background:transparent;border:1px solid var(--red);color:var(--red);border-radius:var(--radius);padding:10px;font-family:'Cairo',sans-serif;font-size:0.8rem;cursor:pointer">
+      <i class="fa-solid fa-trash"></i> مسح الأرشيف
+    </button>
+  </div>
+</div>
+
+<!-- إعدادات الحاسبة -->
+<div class="modal-overlay" id="ic-settings-modal">
+  <div class="modal-panel">
+    <div class="back-btn" onclick="closeM('ic-settings-modal')">رجوع</div>
+    <div class="modal-title">نسب التقسيط</div>
+    <p style="font-size:0.72rem;color:var(--muted);text-align:center;margin-bottom:14px">تعديل نسب الفائدة للمدد الأساسية</p>
+    <div class="ic-settings-grid">
+      <div class="field"><label>3 شهور %</label><input type="number" id="ic-r3" value="15"></div>
+      <div class="field"><label>6 شهور %</label><input type="number" id="ic-r6" value="30"></div>
+      <div class="field"><label>12 شهر %</label><input type="number" id="ic-r12" value="60"></div>
+    </div>
+    <p style="font-size:0.68rem;color:var(--muted);text-align:center;margin:10px 0">المدد اليدوية تُحسب تلقائياً (5% لكل شهر)</p>
+    <button class="btn btn-green" onclick="icSaveSettings()"><i class="fa-solid fa-check"></i> حفظ وإغلاق</button>
+  </div>
+</div>
+
+<!-- موديل الربح -->
+<div class="modal-overlay" id="ic-profit-modal">
+  <div class="modal-panel" style="max-width:320px">
+    <div class="back-btn" onclick="closeM('ic-profit-modal')">رجوع</div>
+    <div class="modal-title">💰 تقرير الأرباح</div>
+    <div style="text-align:center;padding:20px 0">
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px">صافي ربح التقسيط:</div>
+      <div id="ic-profit" style="font-size:2.5rem;font-weight:900;color:var(--green);font-family:Arial">0</div>
+      <div style="font-size:0.7rem;color:var(--muted)">جنيه مصري</div>
+    </div>
+    <button class="btn btn-green" onclick="closeM('ic-profit-modal')"><i class="fa-solid fa-check"></i> إغلاق</button>
+  </div>
+</div>
+
 <!-- ===== BOTTOM NAV BAR ===== -->
 <div class="bottom-nav" id="bottom-nav">
   <!-- يسار: متأخرين + عمليات + تحصيلات -->
@@ -1682,9 +1845,9 @@ input, textarea, select { font-size: 0.88rem !important; }
     <i class="fa-solid fa-chart-bar"></i>
     <span>التحليلات</span>
   </button>
-  <button class="nav-btn" onclick="openSavingsModal()">
-    <i class="fa-solid fa-piggy-bank"></i>
-    <span>التحويش</span>
+  <button class="nav-btn" onclick="openInstCalc()">
+    <i class="fa-solid fa-calculator"></i>
+    <span>الأقساط</span>
   </button>
   <button class="nav-btn" onclick="openM('menu-modal')">
     <i class="fa-solid fa-grip"></i>
@@ -3943,6 +4106,12 @@ function initApp() {
   if(window.fbLoad) window.fbLoad('edit_log', EDIT_LOG_KEY).then(data => {
     if(data) localStorage.setItem(EDIT_LOG_KEY, JSON.stringify(data));
   }).catch(()=>{});
+
+  // تحميل أرشيف الحاسبة من Firebase
+  if(window.fbLoad) window.fbLoad('ic_history', IC_ARCH_KEY).then(data => {
+    if(data) localStorage.setItem(IC_ARCH_KEY, JSON.stringify(data));
+    icUpdateArchCount();
+  }).catch(()=>{});
 }
 
 // تفعيل بوابة كل العملاء اللي مش عندهم كلمة مرور
@@ -5168,6 +5337,259 @@ window.clearPortalMsg = function() {
   document.getElementById('pm-msg-body').value  = '';
   showToast('🗑️ تم حذف الرسالة', 'info');
 };
+
+// ===== INSTALLMENT CALCULATOR =====
+const IC_ARCH_KEY = 'opera_ic_history';
+const IC_MAX = 60;
+let icCurrent = { m:0, p:0, w:0 };
+const icFmt = n => new Intl.NumberFormat('en-US').format(Math.round(n));
+const icR5  = n => Math.ceil(n / 5) * 5;
+
+function icGetRates() {
+  return {
+    3:  parseFloat(document.getElementById('ic-r3')?.value  || 15),
+    6:  parseFloat(document.getElementById('ic-r6')?.value  || 30),
+    12: parseFloat(document.getElementById('ic-r12')?.value || 60),
+  };
+}
+
+function openInstCalc() {
+  icUpdateArchCount();
+  openM('inst-calc-modal');
+}
+
+function icCheckQuickCalc() {
+  // إعادة حساب تلقائي لو كان في نتيجة ظاهرة
+  if(icCurrent.m > 0 && document.getElementById('ic-res-box').style.display !== 'none') {
+    icRunCalc(icCurrent.m);
+  }
+}
+
+function icRunManual() {
+  const mManual   = parseInt(document.getElementById('ic-manual-months').value) || 0;
+  const targetInst = parseFloat(document.getElementById('ic-target-inst').value) || 0;
+  const base = parseFloat(document.getElementById('ic-base-price').value) || 0;
+  const up   = parseFloat(document.getElementById('ic-upfront').value) || 0;
+  const rem  = base - up;
+
+  if(targetInst > 0 && rem > 0) {
+    let found = 0;
+    for(let m=1; m<=18; m++) {
+      const rates = icGetRates();
+      const rate  = rates[m] !== undefined ? rates[m] : m * 5;
+      const mon   = icR5((rem + rem*(rate/100)) / m);
+      if(mon <= targetInst) { found = m; break; }
+      if(m===18) found = 18;
+    }
+    if(found > 0) icRunCalc(found);
+    return;
+  }
+  if(mManual > 0) icRunCalc(mManual);
+}
+
+function icRunCalc(m) {
+  const base = parseFloat(document.getElementById('ic-base-price').value) || 0;
+  if(!base) { showToast('أدخل المبلغ الأساسي أولاً', 'error', 'fa-exclamation'); return; }
+  const up   = parseFloat(document.getElementById('ic-upfront').value) || 0;
+  const name = document.getElementById('ic-cust-name').value.trim();
+  const prod = document.getElementById('ic-prod-type').value.trim();
+
+  // تمييز الزر النشط
+  [3,6,12].forEach(x => {
+    const b = document.getElementById('ic-btn-'+x);
+    if(b) b.classList.toggle('active', x===m);
+  });
+
+  const rem    = base - up;
+  const rates  = icGetRates();
+  const rate   = rates[m] !== undefined ? rates[m] : m * 5;
+  const intr   = rem * (rate / 100);
+  const monRaw = (rem + intr) / m;
+  const mon    = icR5(monRaw);
+  const week   = icR5(mon / 4);
+  const instTot = mon * m;
+  const profit  = instTot - rem;
+  const fullPrc = instTot + up;
+
+  icCurrent = { m, p: profit, w: week };
+
+  document.getElementById('ic-res-title').textContent  = `قسط ${m} شهر`;
+  document.getElementById('ic-mon-val').textContent    = icFmt(mon);
+  document.getElementById('ic-week-val').textContent   = icFmt(week);
+  document.getElementById('ic-total-inst').textContent = icFmt(instTot) + ' EGP';
+  document.getElementById('ic-full-price').textContent = icFmt(fullPrc) + ' EGP';
+  document.getElementById('ic-profit').textContent     = icFmt(profit) + ' EGP';
+
+  const box = document.getElementById('ic-res-box');
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+  icSaveToArchive(name, prod, base, up, m, mon);
+  icUpdateArchCount();
+}
+
+function icReset() {
+  ['ic-cust-name','ic-prod-type','ic-base-price','ic-upfront','ic-manual-months','ic-target-inst'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('ic-res-box').style.display = 'none';
+  [3,6,12].forEach(x => { const b=document.getElementById('ic-btn-'+x); if(b) b.classList.remove('active'); });
+  icCurrent = { m:0, p:0, w:0 };
+}
+
+function icGetFirstInstDate() {
+  const d = new Date(); d.setDate(d.getDate()+26);
+  const day = d.getDate();
+  let target = [10,20,30].find(x => x >= day) || 10;
+  if(target===10 && day>10) d.setMonth(d.getMonth()+1);
+  return `${target}/${d.getMonth()+1}/${d.getFullYear()}`;
+}
+
+function icGetToday() {
+  const d = new Date();
+  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+}
+
+function icSendCustomer() {
+  const name = document.getElementById('ic-cust-name').value.trim() || '...';
+  const prod = document.getElementById('ic-prod-type').value.trim() || '...';
+  const mon  = document.getElementById('ic-mon-val').textContent;
+  const up   = document.getElementById('ic-upfront').value || 0;
+  const tot  = document.getElementById('ic-total-inst').textContent;
+  const full = document.getElementById('ic-full-price').textContent;
+  const txt  = `------------------------------\nOPERA STORE - تفاصيل القسط\nالتاريخ: ${icGetToday()}\nالعميل: ${name}\nالمنتج: ${prod}\nمدة التقسيط: ${icCurrent.m} شهر\nالإجمالي بالمقدم: ${full}\nالمقدم المدفوع: ${icFmt(up)} EGP\nإجمالي المقسط: ${tot}\nالقسط الشهري: ${mon} EGP\nالقسط الأسبوعي: ${icFmt(icCurrent.w)} EGP\nموعد أول قسط: ${icGetFirstInstDate()}\nللتواصل: 01009144655 - 01500041020\nشكراً لتعاملكم معنا\n------------------------------`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`,'_blank');
+}
+
+function icCopyPrint() {
+  const name = document.getElementById('ic-cust-name').value.trim() || '...';
+  const prod = document.getElementById('ic-prod-type').value.trim() || '...';
+  const mon  = document.getElementById('ic-mon-val').textContent;
+  const up   = document.getElementById('ic-upfront').value || 0;
+  const tot  = document.getElementById('ic-total-inst').textContent;
+  const full = document.getElementById('ic-full-price').textContent;
+  const txt  = `========================\n      OPERA STORE       \n========================\nالتاريخ: ${icGetToday()}\nالعميل: ${name}\nالجهاز: ${prod}\nالمدة: ${icCurrent.m} شهر\n------------------------\nالإجمالي: ${full}\nالمقدم: ${icFmt(up)} EGP\nالمقسط: ${tot}\n------------------------\nالقسط: ${mon} EGP\nالأسبوعي: ${icFmt(icCurrent.w)} EGP\nأول قسط: ${icGetFirstInstDate()}\n------------------------\nللتواصل: 01009144655 - 01500041020\nشكراً لتعاملكم معنا\n========================`;
+  if(navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(()=>showToast('✅ تم النسخ','success','fa-copy')).catch(()=>{
+      icFallbackCopy(txt);
+    });
+  } else {
+    icFallbackCopy(txt);
+  }
+}
+
+function icFallbackCopy(txt) {
+  const ta = document.createElement('textarea');
+  ta.value = txt;
+  ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try { document.execCommand('copy'); showToast('✅ تم النسخ','success','fa-copy'); } catch(e) { showToast('⚠️ تعذّر النسخ','error'); }
+  document.body.removeChild(ta);
+}
+
+function icShowProfit() {
+  document.getElementById('ic-profit').textContent = icFmt(icCurrent.p) + ' EGP';
+  openM('ic-profit-modal');
+}
+
+function icSendSelf() {
+  const name = document.getElementById('ic-cust-name').value.trim() || '...';
+  const prod = document.getElementById('ic-prod-type').value.trim() || '...';
+  const cash = document.getElementById('ic-base-price').value || 0;
+  const mon  = document.getElementById('ic-mon-val').textContent;
+  const up   = document.getElementById('ic-upfront').value || 0;
+  const tot  = document.getElementById('ic-total-inst').textContent;
+  const full = document.getElementById('ic-full-price').textContent;
+  const txt  = `------------------------------\nOPERA STORE - تفاصيل القسط\nالتاريخ: ${icGetToday()}\nالعميل: ${name}\nالمنتج: ${prod}\nالسعر كاش: ${icFmt(cash)} EGP\nمدة التقسيط: ${icCurrent.m} شهر\nالإجمالي بالمقدم: ${full}\nالمقدم المدفوع: ${icFmt(up)} EGP\nإجمالي المقسط: ${tot}\nالقسط الشهري: ${mon} EGP\nالقسط الأسبوعي: ${icFmt(icCurrent.w)} EGP\nموعد أول قسط: ${icGetFirstInstDate()}\nالربح الصافي: ${icFmt(icCurrent.p)} EGP\n------------------------------`;
+  window.open(`https://wa.me/201554223678?text=${encodeURIComponent(txt)}`,'_blank');
+}
+
+function icSaveToArchive(name, prod, base, up, months, monthly) {
+  let hist = JSON.parse(localStorage.getItem(IC_ARCH_KEY) || '[]');
+  const isDup = hist.some(x =>
+    x.name===(name||'بدون اسم') && x.prod===(prod||'غير محدد') &&
+    x.base===base && x.up===up && x.months===months
+  );
+  if(isDup) return;
+  hist.unshift({ date: new Date().toLocaleString('ar-EG'), name: name||'بدون اسم', prod: prod||'غير محدد', base, up, months, monthly });
+  if(hist.length > IC_MAX) hist = hist.slice(0, IC_MAX);
+  localStorage.setItem(IC_ARCH_KEY, JSON.stringify(hist));
+  // حفظ في Firebase
+  if(window.fbSave) window.fbSave('ic_history', hist).catch(()=>{});
+}
+
+function icUpdateArchCount() {
+  const hist = JSON.parse(localStorage.getItem(IC_ARCH_KEY) || '[]');
+  const el = document.getElementById('ic-arch-count');
+  if(el) el.textContent = hist.length ? hist.length : '';
+}
+
+function icShowArchive() {
+  // مزامنة من Firebase أولاً
+  if(window.fbLoad) {
+    window.fbLoad('ic_history', IC_ARCH_KEY).then(data => {
+      if(data) localStorage.setItem(IC_ARCH_KEY, JSON.stringify(data));
+      icFilterArchive();
+    }).catch(()=>icFilterArchive());
+  } else {
+    icFilterArchive();
+  }
+  document.getElementById('ic-arch-search').value = '';
+  openM('ic-archive-modal');
+}
+
+function icFilterArchive() {
+  const hist   = JSON.parse(localStorage.getItem(IC_ARCH_KEY) || '[]');
+  const q      = (document.getElementById('ic-arch-search')?.value || '').toLowerCase();
+  const filt   = hist.filter(x => !q || x.name.toLowerCase().includes(q) || x.prod.toLowerCase().includes(q));
+  const el     = document.getElementById('ic-arch-content');
+  if(!el) return;
+  if(!filt.length) { el.innerHTML = '<div class="empty"><i class="fa-solid fa-inbox"></i><p>لا توجد نتائج</p></div>'; return; }
+  el.innerHTML = filt.map((item, i) => {
+    const origIdx = hist.findIndex(x => x.date===item.date && x.name===item.name);
+    return `<div class="ic-arch-item" onclick="icLoadArchItem(${origIdx})">
+      <small>${item.date}</small>
+      <div class="ic-arch-name">${item.name}</div>
+      <div class="ic-arch-prod">${item.prod}</div>
+      <div style="display:flex;gap:10px;font-size:0.7rem;color:var(--muted);margin-top:3px">
+        <span>أساسي: ${icFmt(item.base)} ج</span>
+        <span>مقدم: ${icFmt(item.up)} ج</span>
+      </div>
+      <div class="ic-arch-inst">قسط: ${icFmt(item.monthly)} ج × ${item.months} ش</div>
+    </div>`;
+  }).join('');
+}
+
+function icLoadArchItem(idx) {
+  const hist = JSON.parse(localStorage.getItem(IC_ARCH_KEY) || '[]');
+  const item = hist[idx];
+  if(!item) return;
+  document.getElementById('ic-cust-name').value  = item.name;
+  document.getElementById('ic-prod-type').value  = item.prod;
+  document.getElementById('ic-base-price').value = item.base;
+  document.getElementById('ic-upfront').value    = item.up;
+  closeM('ic-archive-modal');
+  icRunCalc(item.months);
+}
+
+function icClearArchive() {
+  if(!confirm('هل تريد مسح كل الأرشيف؟')) return;
+  localStorage.removeItem(IC_ARCH_KEY);
+  if(window.fbSave) window.fbSave('ic_history', []).catch(()=>{});
+  icFilterArchive();
+  icUpdateArchCount();
+  showToast('🗑️ تم مسح الأرشيف', 'info');
+}
+
+function icShowSettings() {
+  openM('ic-settings-modal');
+}
+
+function icSaveSettings() {
+  showToast('✅ تم حفظ النسب', 'success', 'fa-check');
+  closeM('ic-settings-modal');
+}
 </script>
 </body>
 </html>
