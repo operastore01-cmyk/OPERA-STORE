@@ -1499,7 +1499,14 @@ input, textarea, select { font-size: 0.88rem !important; }
     <div class="modal-title">🌐 بوابة العميل</div>
     <div id="portal-manager-cust-name" style="text-align:center;font-size:0.82rem;color:var(--muted);margin-top:-10px;margin-bottom:18px"></div>
 
-    <!-- تغيير كلمة السر -->
+    <!-- حالة البوابة — إيقاف / تفعيل -->
+    <div id="pm-suspend-box" style="border-radius:var(--radius2);padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-size:0.82rem;font-weight:800;margin-bottom:3px" id="pm-suspend-title"></div>
+        <div style="font-size:0.68rem;color:var(--muted)" id="pm-suspend-sub"></div>
+      </div>
+      <button id="pm-suspend-btn" onclick="togglePortalSuspend()" style="flex-shrink:0;padding:9px 18px;border-radius:20px;font-family:'Cairo',sans-serif;font-weight:800;font-size:0.78rem;cursor:pointer;border:none;transition:all 0.2s"></button>
+    </div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius2);padding:16px;margin-bottom:14px">
       <div style="font-size:0.82rem;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:7px"><i class="fa-solid fa-key" style="color:var(--orange)"></i> تغيير كلمة المرور</div>
       <div class="field" style="margin-bottom:10px;position:relative">
@@ -5004,7 +5011,51 @@ window.openPortalManager = function() {
   });
   const activeBtn = [...document.querySelectorAll('.pm-type-btn')].find(b => b.getAttribute('onclick')?.includes("'"+window._pmMsgType+"'"));
   if(activeBtn) { activeBtn.style.border = '1.5px solid var(--accent)'; activeBtn.style.background = 'rgba(124,107,255,0.12)'; activeBtn.style.color = 'var(--accent2)'; }
+  // حالة الإيقاف
+  renderSuspendBox(c);
   openM('portal-manager-modal');
+};
+
+function renderSuspendBox(c) {
+  const box = document.getElementById('pm-suspend-box');
+  const title = document.getElementById('pm-suspend-title');
+  const sub   = document.getElementById('pm-suspend-sub');
+  const btn   = document.getElementById('pm-suspend-btn');
+  if(c.portalSuspended) {
+    box.style.background  = 'rgba(248,113,113,0.08)';
+    box.style.border      = '1px solid rgba(248,113,113,0.25)';
+    title.innerHTML = '<i class="fa-solid fa-ban" style="color:var(--red);margin-left:5px"></i> البوابة موقوفة';
+    title.style.color = 'var(--red)';
+    sub.textContent   = 'العميل لا يستطيع الدخول حالياً';
+    btn.textContent   = '✅ تفعيل البوابة';
+    btn.style.background = 'rgba(52,211,153,0.15)';
+    btn.style.color      = 'var(--green)';
+    btn.style.border     = '1px solid rgba(52,211,153,0.3)';
+  } else {
+    box.style.background  = 'rgba(52,211,153,0.06)';
+    box.style.border      = '1px solid rgba(52,211,153,0.2)';
+    title.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--green);margin-left:5px"></i> البوابة مفعّلة';
+    title.style.color = 'var(--green)';
+    sub.textContent   = 'العميل يستطيع الدخول بشكل طبيعي';
+    btn.textContent   = '🚫 إيقاف البوابة';
+    btn.style.background = 'rgba(248,113,113,0.1)';
+    btn.style.color      = 'var(--red)';
+    btn.style.border     = '1px solid rgba(248,113,113,0.25)';
+  }
+}
+
+window.togglePortalSuspend = function() {
+  const c = customers.find(x => x.id === activeCustomerId);
+  if(!c) return;
+  const willSuspend = !c.portalSuspended;
+  const msg = willSuspend
+    ? `هل تريد إيقاف بوابة "${c.name}" مؤقتاً؟\nلن يتمكن من الدخول حتى تعيد التفعيل.`
+    : `هل تريد إعادة تفعيل بوابة "${c.name}"؟`;
+  if(!confirm(msg)) return;
+  c.portalSuspended = willSuspend;
+  save();
+  renderSuspendBox(c);
+  showToast(willSuspend ? '🚫 تم إيقاف البوابة' : '✅ تم تفعيل البوابة', willSuspend ? 'error' : 'success');
 };
 
 window.selectMsgType = function(type, el) {
