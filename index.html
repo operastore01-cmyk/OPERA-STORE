@@ -546,6 +546,44 @@ select option { background:var(--surface2); }
 .donut-legend-item { display: flex; align-items: center; gap: 4px; }
 .donut-legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
+/* ===== DASHBOARD FILTER BAR ===== */
+.dash-filter-bar {
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 14px; padding: 10px 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); position: sticky; top: 0; z-index: 10;
+}
+.dash-filter-btn {
+  padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--surface3); color: var(--muted);
+  font-family: 'Cairo', sans-serif; font-size: 0.68rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+.dash-filter-btn.active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.dash-filter-btn:hover:not(.active) { border-color: var(--border2); color: var(--text); }
+.dash-export-btn {
+  margin-right: auto; padding: 5px 12px; border-radius: 20px;
+  border: 1px solid rgba(52,211,153,0.3); background: rgba(52,211,153,0.08);
+  color: var(--green); font-family: 'Cairo', sans-serif; font-size: 0.68rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap; display: flex; align-items: center; gap: 5px;
+}
+.dash-export-btn:hover { background: rgba(52,211,153,0.16); }
+.health-score-ring {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.health-score-ring svg { overflow: visible; }
+.trend-line-svg { overflow: visible; }
+.payment-heatmap-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.yoy-badge {
+  font-size: 0.5rem; padding: 2px 5px; border-radius: 8px; font-weight: 700;
+}
+.yoy-up { background: rgba(52,211,153,0.15); color: var(--green); }
+.yoy-down { background: rgba(248,113,113,0.15); color: var(--red); }
+
 /* ===== EDIT LOG ===== */
 .edit-log-row {
   display: flex; align-items: flex-start; gap: 10px;
@@ -4417,7 +4455,8 @@ function openDashboard() {
   if(!currentUser.isAdmin && !hasPermission('canViewReport')) {
     showToast('غير مصرح', 'error', 'fa-lock'); return;
   }
-  buildDashboard();
+  dashPeriod = 'all';
+  buildDashboard(false);
   openM('dashboard-modal');
 }
 
@@ -4489,129 +4528,376 @@ function copyPayRef(e, ref) {
   });
 }
 
-function buildDashboard() {
-  const container = document.getElementById('dashboard-content');
+// ── فلتر لوحة التحليلات ──
+let dashPeriod = 'all'; // all | 3m | 6m | 12m | ytd
+function setDashPeriod(p) {
+  dashPeriod = p;
+  document.querySelectorAll('.dash-filter-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('dbf-'+p);
+  if(btn) btn.classList.add('active');
+  buildDashboard(true);
+}
 
-  // حساب البيانات
+function getDashPeriodStart() {
+  const now = new Date();
+  if(dashPeriod === '3m')  { const d = new Date(now); d.setMonth(d.getMonth()-3); return d; }
+  if(dashPeriod === '6m')  { const d = new Date(now); d.setMonth(d.getMonth()-6); return d; }
+  if(dashPeriod === '12m') { const d = new Date(now); d.setFullYear(d.getFullYear()-1); return d; }
+  if(dashPeriod === 'ytd') { return new Date(now.getFullYear(), 0, 1); }
+  return null; // all
+}
+
+function exportDashboardWhatsApp() {
+  const now = new Date();
+  const activeCustomers = customers.filter(c => !c.archived);
+  const totalContracts  = activeCustomers.length;
+  const totalDueNow     = activeCustomers.reduce((s,c)=>s+calculateDueAmount(c),0);
+  const lateCustomers   = activeCustomers.filter(c=>calculateDueAmount(c)>0);
+  const totalPortfolio  = activeCustomers.reduce((s,c)=>s+(c.total-c.down-(c.earlyDiscount||0)),0);
+  const totalCollectedAll = customers.reduce((s,c)=>s+c.payments.reduce((a,p)=>a+p.amount,0),0);
+  const collectionRate  = totalPortfolio > 0 ? Math.round((totalCollectedAll/totalPortfolio)*100) : 0;
+  const thisMonthPaid   = (() => {
+    let t=0;
+    customers.forEach(c => c.payments.forEach(p => {
+      const pd = new Date(p.fullDate||p.date);
+      if(pd.getMonth()===now.getMonth()&&pd.getFullYear()===now.getFullYear()) t+=p.amount;
+    }));
+    return t;
+  })();
+  const scoreData = calcHealthScore(activeCustomers, lateCustomers, collectionRate, totalDueNow, totalPortfolio);
+
+  const d = now.getDate()+'/'+(now.getMonth()+1)+'/'+now.getFullYear();
+  const txt = `━━━━━━━━━━━━━━━━━━━━━
+📊 تقرير التحليلات — OPERA STORE
+📅 ${d}
+━━━━━━━━━━━━━━━━━━━━━
+🏥 صحة المحفظة: ${scoreData.score}/100 ${scoreData.grade}
+━━━━━━━━━━━━━━━━━━━━━
+👥 إجمالي العملاء النشطين: ${totalContracts}
+🔴 المتأخرون: ${lateCustomers.length} عميل
+💰 إجمالي المحفظة: ${fmt(totalPortfolio)} ج.م
+✅ إجمالي المحصّل: ${fmt(totalCollectedAll)} ج.م
+📈 نسبة التحصيل الكلية: ${collectionRate}%
+━━━━━━━━━━━━━━━━━━━━━
+🗓 محصّل هذا الشهر: ${fmt(thisMonthPaid)} ج.م
+⚠️ إجمالي المتأخرات: ${fmt(totalDueNow)} ج.م
+━━━━━━━━━━━━━━━━━━━━━
+للتواصل: 01009144655 - 01500041020`;
+  window.open(`https://wa.me/201554223678?text=${encodeURIComponent(txt)}`,'_blank');
+}
+
+function calcHealthScore(activeCustomers, lateCustomers, collectionRate, totalDueNow, totalPortfolio) {
+  let score = 100;
+  const latePct = activeCustomers.length > 0 ? (lateCustomers.length / activeCustomers.length) * 100 : 0;
+  const duePct  = totalPortfolio > 0 ? (totalDueNow / totalPortfolio) * 100 : 0;
+  score -= Math.min(30, latePct * 1.5);
+  score -= Math.min(30, duePct * 2);
+  score -= Math.max(0, (100 - collectionRate) * 0.4);
+  score = Math.max(0, Math.round(score));
+  let grade = score >= 80 ? '🟢 ممتاز' : score >= 60 ? '🟡 جيد' : score >= 40 ? '🟠 متوسط' : '🔴 ضعيف';
+  let color = score >= 80 ? 'var(--green)' : score >= 60 ? '#a3e635' : score >= 40 ? 'var(--orange)' : 'var(--red)';
+  return { score, grade, color };
+}
+
+function buildDashboard(keepScroll) {
+  const container = document.getElementById('dashboard-content');
+  const scrollTop = keepScroll ? container.parentElement.scrollTop : 0;
   const months = ['يناير','فبراير','مارس','إبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
   const now = new Date();
+  const periodStart = getDashPeriodStart();
+  const allCustomers = customers;
+  const activeCustomers = customers.filter(c => !c.archived);
+  // فلترة المدفوعات حسب الفترة المختارة
+  const filteredPayments = (c) => periodStart
+    ? c.payments.filter(p => new Date(p.fullDate||p.date) >= periodStart)
+    : c.payments;
+
+  // ── التحصيل الشهري آخر 6 أشهر + السنة السابقة ──
   const monthlyCollection = Array(6).fill(0);
+  const monthlyExpected   = Array(6).fill(0);
+  const monthlyLastYear   = Array(6).fill(0);
   const monthLabels = [];
   for(let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const dLY = new Date(now.getFullYear()-1, now.getMonth() - i, 1);
     monthLabels.push(months[d.getMonth()].slice(0,3));
     customers.forEach(c => {
       c.payments.forEach(p => {
         const pd = new Date(p.fullDate || p.date);
-        if(pd.getFullYear() === d.getFullYear() && pd.getMonth() === d.getMonth()) {
+        if(pd.getFullYear() === d.getFullYear() && pd.getMonth() === d.getMonth())
           monthlyCollection[5-i] += p.amount;
-        }
+        if(pd.getFullYear() === dLY.getFullYear() && pd.getMonth() === dLY.getMonth())
+          monthlyLastYear[5-i] += p.amount;
       });
+      if(!c.archived) monthlyExpected[5-i] += c.monthly;
     });
   }
-  const maxCol = Math.max(...monthlyCollection, 1);
+  const maxCol = Math.max(...monthlyCollection, ...monthlyExpected, 1);
 
-  // توزيع العملاء حسب الحالة
+  // ── Forecast 3 أشهر قادمة ──
+  const forecastMonths = [];
+  for(let i=1;i<=3;i++) {
+    const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+    const label = months[d.getMonth()].slice(0,3);
+    const expected = activeCustomers.reduce((s,c)=>{
+      const paid = c.payments.reduce((a,p)=>a+p.amount,0);
+      const rem  = (c.total-c.down-(c.earlyDiscount||0)) - paid;
+      return s + (rem > 0 ? c.monthly : 0);
+    },0);
+    // تعديل الـ forecast بناءً على نسبة التحصيل التاريخية
+    const histRate = monthlyExpected[5] > 0 ? monthlyCollection[5] / monthlyExpected[5] : 0.8;
+    forecastMonths.push({ label, expected, adjusted: Math.round(expected * Math.min(histRate, 1)) });
+  }
+
+  // ── توزيع العملاء حسب الحالة ──
   let countOk=0, countWarn=0, countBad=0, countDone=0;
-  customers.forEach(c => {
-    if(c.archived) return;
+  activeCustomers.forEach(c => {
     const s = getCardStatus(c);
     if(s==='ok') countOk++; else if(s==='warn') countWarn++;
     else if(s==='bad') countBad++; else countDone++;
   });
-  const totalC = countOk+countWarn+countBad+countDone || 1;
 
-  // أعلى المنتجات
+  // ── أعلى المنتجات ──
   const prodMap = {};
   customers.forEach(c => {
     const n = (c.prod||'غير محدد').trim();
-    if(!prodMap[n]) prodMap[n] = 0;
-    prodMap[n]++;
+    prodMap[n] = (prodMap[n]||0) + 1;
   });
-  const topProds = Object.entries(prodMap).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const topProds = Object.entries(prodMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const maxProd = Math.max(...topProds.map(p=>p[1]), 1);
 
-  // توقع الشهر القادم
+  // ── أرقام هذا الشهر والقادم ──
   const thisMonthPaid = monthlyCollection[5];
   const lastMonthPaid = monthlyCollection[4];
-  const nextMonthExpected = customers.reduce((s,c) => {
-    const paid = c.payments.reduce((a,p) => a+p.amount, 0);
-    const rem = (c.total-c.down-(c.earlyDiscount||0)) - paid;
-    return s + (rem > 0 && !c.archived ? c.monthly : 0);
+  const thisMonthExpected = monthlyExpected[5];
+  const thisMonthAchievement = thisMonthExpected > 0 ? Math.round((thisMonthPaid/thisMonthExpected)*100) : 0;
+  const nextMonthExpected = activeCustomers.reduce((s,c) => {
+    const paid = c.payments.reduce((a,p)=>a+p.amount,0);
+    const rem  = (c.total-c.down-(c.earlyDiscount||0)) - paid;
+    return s + (rem > 0 ? c.monthly : 0);
   }, 0);
-  const growthPct = lastMonthPaid > 0 ? Math.round(((thisMonthPaid - lastMonthPaid) / lastMonthPaid) * 100) : 0;
+  const growthPct = lastMonthPaid > 0 ? Math.round(((thisMonthPaid-lastMonthPaid)/lastMonthPaid)*100) : 0;
 
-  // ===== إحصائيات الأيام 10 / 20 / 30 =====
+  // ── إحصائيات الأيام ──
   function getDayStats(day) {
-    const active = customers.filter(c => !c.archived && c.dueDay === day);
-    const totalMonthly = active.reduce((s,c) => s+c.monthly, 0);
-    const due = active.reduce((s,c) => s+calculateDueAmount(c), 0);
-    const ok = active.filter(c => getCardStatus(c) === 'ok').length;
-    const late = active.filter(c => getCardStatus(c) === 'bad').length;
-    const warn = active.filter(c => getCardStatus(c) === 'warn').length;
-    const done = active.filter(c => getCardStatus(c) === 'done').length;
-    return { count: active.length, totalMonthly, due, ok, late, warn, done };
+    const active = activeCustomers.filter(c => c.dueDay === day);
+    const totalMonthly = active.reduce((s,c)=>s+c.monthly,0);
+    const due  = active.reduce((s,c)=>s+calculateDueAmount(c),0);
+    const ok   = active.filter(c=>getCardStatus(c)==='ok').length;
+    const late = active.filter(c=>getCardStatus(c)==='bad').length;
+    const warn = active.filter(c=>getCardStatus(c)==='warn').length;
+    const done = active.filter(c=>getCardStatus(c)==='done').length;
+    return { count:active.length, totalMonthly, due, ok, late, warn, done };
   }
-  const day10 = getDayStats(10);
-  const day20 = getDayStats(20);
-  const day30 = getDayStats(30);
+  const day10=getDayStats(10), day20=getDayStats(20), day30=getDayStats(30);
 
-  // ===== إحصائيات إضافية =====
-  const totalContracts = customers.filter(c => !c.archived).length;
+  // ── إحصائيات المحفظة ──
+  const totalContracts    = activeCustomers.length;
   const completedContracts = customers.filter(c => {
     const paid = c.payments.reduce((s,p)=>s+p.amount,0);
-    const rem = (c.total-c.down-(c.earlyDiscount||0)) - paid;
-    return rem <= 0;
+    return (c.total-c.down-(c.earlyDiscount||0)) - paid <= 0;
   }).length;
-  const totalPortfolio = customers.filter(c=>!c.archived).reduce((s,c) => s+(c.total-c.down-(c.earlyDiscount||0)), 0);
-  const totalCollectedAll = customers.reduce((s,c) => s+c.payments.reduce((a,p)=>a+p.amount,0), 0);
-  const collectionRate = totalPortfolio > 0 ? Math.round((totalCollectedAll/totalPortfolio)*100) : 0;
-  const avgMonthly = totalContracts > 0
-    ? Math.round(customers.filter(c=>!c.archived).reduce((s,c)=>s+c.monthly,0) / totalContracts)
-    : 0;
-  const totalDueNow = customers.filter(c=>!c.archived).reduce((s,c) => s+calculateDueAmount(c), 0);
+  const totalPortfolio    = activeCustomers.reduce((s,c)=>s+(c.total-c.down-(c.earlyDiscount||0)),0);
+  const totalCollectedAll = customers.reduce((s,c)=>s+c.payments.reduce((a,p)=>a+p.amount,0),0);
+  const collectionRate    = totalPortfolio > 0 ? Math.round((totalCollectedAll/totalPortfolio)*100) : 0;
+  const avgMonthly        = totalContracts > 0 ? Math.round(activeCustomers.reduce((s,c)=>s+c.monthly,0)/totalContracts) : 0;
+  const totalDueNow       = activeCustomers.reduce((s,c)=>s+calculateDueAmount(c),0);
+  const lateCustomers     = activeCustomers.filter(c=>calculateDueAmount(c)>0);
+  // نسبة الخطر (قيمة المتأخرات / إجمالي المحفظة)
+  const riskRate          = totalPortfolio > 0 ? Math.round((totalDueNow/totalPortfolio)*100) : 0;
+  // متوسط مدة العقود
+  const avgMonths         = totalContracts > 0 ? Math.round(activeCustomers.reduce((s,c)=>s+(c.months||12),0)/totalContracts) : 0;
+  // Health Score
+  const healthData        = calcHealthScore(activeCustomers, lateCustomers, collectionRate, totalDueNow, totalPortfolio);
 
-  // بناء HTML
+  // ── ربحية المحفظة ──
+  const totalCashPrice    = customers.reduce((s,c)=>s+(c.sell||0),0);
+  const totalInstTotal    = customers.reduce((s,c)=>s+(c.total||0),0);
+  const totalProfit       = totalInstTotal - totalCashPrice;
+  const profitRate        = totalCashPrice > 0 ? Math.round((totalProfit/totalCashPrice)*100) : 0;
+  // الربح الفعلي المحقق (من المدفوعات)
+  const realizedProfit = customers.reduce((s,c) => {
+    const paid = c.payments.reduce((a,p)=>a+p.amount,0);
+    const cashBase = c.sell || 0;
+    const rem = cashBase - c.down;
+    if(cashBase === 0) return s;
+    const profitPerUnit = (c.total||0) - cashBase;
+    const paidRatio = (c.total||0) > 0 ? paid / (c.total - c.down) : 0;
+    return s + Math.max(0, profitPerUnit * paidRatio);
+  },0);
+  // ربحية حسب المنتج
+  const prodProfitMap = {};
+  customers.forEach(c => {
+    const n = (c.prod||'غير محدد').trim();
+    if(!prodProfitMap[n]) prodProfitMap[n] = {count:0, profit:0, revenue:0};
+    prodProfitMap[n].count++;
+    prodProfitMap[n].profit += (c.total||0) - (c.sell||0);
+    prodProfitMap[n].revenue += (c.total||0);
+  });
+  const topProdProfit = Object.entries(prodProfitMap).sort((a,b)=>b[1].profit-a[1].profit).slice(0,4);
+
+  // ── أعمار الديون ──
+  const debtAge = { d7:0, d30:0, d60:0, d60p:0, amt7:0, amt30:0, amt60:0, amt60p:0 };
+  lateCustomers.forEach(c => {
+    const ni = (typeof calcNextInstallmentInfo === 'function') ? calcNextInstallmentInfo(c) : null;
+    const days = ni ? (ni.daysLeft||0) : 0;
+    const due  = calculateDueAmount(c);
+    if(days <= 7)       { debtAge.d7++;   debtAge.amt7   += due; }
+    else if(days <= 30) { debtAge.d30++;  debtAge.amt30  += due; }
+    else if(days <= 60) { debtAge.d60++;  debtAge.amt60  += due; }
+    else                { debtAge.d60p++; debtAge.amt60p += due; }
+  });
+  // ديون معدومة المخاطر (+60 يوم) كنسبة
+  const badDebtRisk = totalPortfolio > 0 ? Math.round((debtAge.amt60p / totalPortfolio)*100) : 0;
+
+  // ── هيت ماب أوقات الدفع (أي يوم من الشهر) ──
+  const payDayMap = {};
+  customers.forEach(c => {
+    c.payments.forEach(p => {
+      const pd = new Date(p.fullDate||p.date);
+      const day = pd.getDate();
+      if(!payDayMap[day]) payDayMap[day] = {count:0, amt:0};
+      payDayMap[day].count++;
+      payDayMap[day].amt += p.amount;
+    });
+  });
+  // أكثر 7 أيام نشاطاً
+  const topPayDays = Object.entries(payDayMap).sort((a,b)=>b[1].count-a[1].count).slice(0,7).map(([day,v])=>({day,count:v.count,amt:v.amt}));
+  const maxPayCount = Math.max(...topPayDays.map(x=>x.count),1);
+
+  // ── معدل الالتزام لكل عميل (أفضل 5 وأسوأ 5) ──
+  const commitRates = activeCustomers.map(c => {
+    const ni    = (typeof calcNextInstallmentInfo === 'function') ? calcNextInstallmentInfo(c) : null;
+    const paid  = c.payments.reduce((s,p)=>s+p.amount,0);
+    const total = c.total - c.down - (c.earlyDiscount||0);
+    const expectedMonths = c.monthly > 0 ? Math.floor((Date.now()-new Date(c.receiveDate||Date.now()))/(1000*60*60*24*30.44)) : 0;
+    const expectedPaid   = Math.min(expectedMonths * c.monthly, total);
+    const rate = expectedPaid > 0 ? Math.min(100, Math.round((paid/expectedPaid)*100)) : 100;
+    return { name: c.name, rate, due: calculateDueAmount(c), id: c.id };
+  }).sort((a,b)=>a.rate-b.rate);
+  const worstCommit = commitRates.slice(0,5).filter(x=>x.rate<100);
+  const bestCommit  = commitRates.slice(-3).reverse().filter(x=>x.rate>=100);
+
   container.innerHTML = `
-    <!-- كروت ملخص -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center">
-        <div style="font-size:0.6rem;color:var(--muted);margin-bottom:4px">المحصل هذا الشهر</div>
-        <div style="font-size:1rem;font-weight:800;color:var(--green)">${fmt(thisMonthPaid)}</div>
-        <div style="font-size:0.6rem;margin-top:3px;color:${growthPct>=0?'var(--green)':'var(--red)'}">
-          ${growthPct >= 0 ? '▲' : '▼'} ${Math.abs(growthPct)}% عن الشهر السابق
+    <!-- ═══ شريط الفلتر الزمني ═══ -->
+    <div class="dash-filter-bar">
+      <span style="font-size:0.6rem;color:var(--muted);font-weight:700">الفترة:</span>
+      <button id="dbf-all" class="dash-filter-btn ${dashPeriod==='all'?'active':''}" onclick="setDashPeriod('all')">الكل</button>
+      <button id="dbf-3m"  class="dash-filter-btn ${dashPeriod==='3m'?'active':''}"  onclick="setDashPeriod('3m')">3 أشهر</button>
+      <button id="dbf-6m"  class="dash-filter-btn ${dashPeriod==='6m'?'active':''}"  onclick="setDashPeriod('6m')">6 أشهر</button>
+      <button id="dbf-12m" class="dash-filter-btn ${dashPeriod==='12m'?'active':''}" onclick="setDashPeriod('12m')">سنة</button>
+      <button id="dbf-ytd" class="dash-filter-btn ${dashPeriod==='ytd'?'active':''}" onclick="setDashPeriod('ytd')">منذ يناير</button>
+      <button class="dash-export-btn" onclick="exportDashboardWhatsApp()">
+        <i class="fa-brands fa-whatsapp"></i> مشاركة التقرير
+      </button>
+    </div>
+
+    <!-- ═══ Health Score ═══ -->
+    <div class="chart-card" style="margin-bottom:12px;background:linear-gradient(135deg,var(--surface),rgba(124,107,255,0.06))">
+      <div class="chart-title">🏥 مؤشر صحة المحفظة</div>
+      <div style="display:flex;align-items:center;gap:16px;margin-top:8px">
+        <div class="health-score-ring">
+          <svg width="80" height="80" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="33" fill="none" stroke="var(--surface3)" stroke-width="9"/>
+            <circle cx="40" cy="40" r="33" fill="none" stroke="${healthData.color}" stroke-width="9"
+              stroke-dasharray="${Math.round((healthData.score/100)*207.3)} 207.3"
+              stroke-dashoffset="51.8"
+              stroke-linecap="round"
+              transform="rotate(-90 40 40)"
+              style="transition:stroke-dasharray 0.8s ease"/>
+            <text x="40" y="36" text-anchor="middle" font-family="Cairo,sans-serif" font-weight="900" font-size="16" fill="${healthData.color}">${healthData.score}</text>
+            <text x="40" y="50" text-anchor="middle" font-family="Cairo,sans-serif" font-size="7" fill="var(--muted)">من 100</text>
+          </svg>
         </div>
-      </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center">
-        <div style="font-size:0.6rem;color:var(--muted);margin-bottom:4px">متوقع الشهر القادم</div>
-        <div style="font-size:1rem;font-weight:800;color:var(--accent2)">${fmt(nextMonthExpected)}</div>
-        <div style="font-size:0.6rem;color:var(--muted);margin-top:3px">بناءً على الأقساط الشهرية</div>
+        <div style="flex:1">
+          <div style="font-size:1rem;font-weight:900;color:${healthData.color};margin-bottom:6px">${healthData.grade}</div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            ${[
+              {lbl:'نسبة التحصيل', val:collectionRate+'%', color: collectionRate>=80?'var(--green)':collectionRate>=50?'var(--orange)':'var(--red)'},
+              {lbl:'المتأخرون', val:lateCustomers.length+' / '+totalContracts, color: lateCustomers.length===0?'var(--green)':'var(--red)'},
+              {lbl:'نسبة الخطر', val:riskRate+'%', color: riskRate<=5?'var(--green)':riskRate<=15?'var(--orange)':'var(--red)'},
+              {lbl:'ديون +60 يوم', val:badDebtRisk+'%', color: badDebtRisk===0?'var(--green)':badDebtRisk<=5?'var(--orange)':'var(--red)'},
+            ].map(x=>`<div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:0.58rem;color:var(--muted)">${x.lbl}</span>
+              <span style="font-size:0.65rem;font-weight:800;color:${x.color}">${x.val}</span>
+            </div>`).join('')}
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- رسم التحصيل الشهري -->
+    <!-- ═══ صف أداء الشهر ═══ -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center">
+        <div style="font-size:0.55rem;color:var(--muted);margin-bottom:3px">المحصّل هذا الشهر</div>
+        <div style="font-size:0.95rem;font-weight:800;color:var(--green)">${fmt(thisMonthPaid)}</div>
+        <div style="font-size:0.55rem;margin-top:3px;color:${growthPct>=0?'var(--green)':'var(--red)'}">
+          ${growthPct>=0?'▲':'▼'} ${Math.abs(growthPct)}% الشهر السابق
+        </div>
+        ${monthlyLastYear[5]>0?`<div class="yoy-badge ${monthlyCollection[5]>=monthlyLastYear[5]?'yoy-up':'yoy-down'}" style="margin-top:3px;display:inline-block">
+          YoY ${monthlyCollection[5]>=monthlyLastYear[5]?'▲':'▼'}${Math.abs(Math.round(((monthlyCollection[5]-monthlyLastYear[5])/monthlyLastYear[5])*100))}%
+        </div>`:''}
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center">
+        <div style="font-size:0.55rem;color:var(--muted);margin-bottom:3px">نسبة تحقيق الشهر</div>
+        <div style="font-size:0.95rem;font-weight:800;color:${thisMonthAchievement>=80?'var(--green)':thisMonthAchievement>=50?'var(--orange)':'var(--red)'}">${thisMonthAchievement}%</div>
+        <div style="font-size:0.55rem;color:var(--muted);margin-top:3px">متوقع: ${fmt(thisMonthExpected)}</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center">
+        <div style="font-size:0.55rem;color:var(--muted);margin-bottom:3px">متوقع الشهر القادم</div>
+        <div style="font-size:0.95rem;font-weight:800;color:var(--accent2)">${fmt(nextMonthExpected)}</div>
+        <div style="font-size:0.55rem;color:var(--muted);margin-top:3px">من ${totalContracts} عميل نشط</div>
+      </div>
+    </div>
+
+    <!-- ═══ رسم التحصيل الشهري + YoY ═══ -->
     <div class="chart-card" style="margin-bottom:12px">
-      <div class="chart-title">📈 التحصيل الشهري (آخر ٦ أشهر)</div>
+      <div class="chart-title">📈 التحصيل الشهري — محصّل vs متوقع (آخر ٦ أشهر)</div>
       <div class="bar-chart">
         ${monthlyCollection.map((v, i) => `
-          <div class="bar-item">
-            <div style="font-size:0.5rem;color:var(--muted);margin-bottom:2px">${fmt(v/1000).replace(',','.')}k</div>
-            <div class="bar-fill" style="height:${Math.round((v/maxCol)*60)+4}px;background:${i===5?'var(--accent)':'rgba(124,107,255,0.3)'}"></div>
+          <div class="bar-item" style="position:relative">
+            <div style="font-size:0.48rem;color:var(--muted);margin-bottom:2px">${fmt(v/1000).replace(',','.')}k</div>
+            <div style="position:relative;width:100%;display:flex;flex-direction:column;align-items:center;gap:1px">
+              <div class="bar-fill" style="width:80%;height:${Math.round((v/maxCol)*56)+4}px;background:${i===5?'var(--accent)':'rgba(124,107,255,0.35)'};border-radius:3px 3px 0 0"></div>
+              <div style="width:80%;height:${Math.round((monthlyExpected[i]/maxCol)*56)+4}px;background:${i===5?'rgba(52,211,153,0.25)':'rgba(52,211,153,0.12)'};border-radius:0 0 3px 3px;border-top:1px dashed rgba(52,211,153,0.5)"></div>
+            </div>
+            ${monthlyLastYear[i]>0?`<div style="width:80%;height:2px;background:rgba(96,165,250,0.5);border-radius:2px;margin-top:1px"></div>`:''}
             <div class="bar-lbl">${monthLabels[i]}</div>
           </div>`).join('')}
       </div>
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:6px;font-size:0.55rem;color:var(--muted)">
+        <span><span style="display:inline-block;width:8px;height:8px;background:var(--accent);border-radius:2px;margin-left:3px"></span>محصّل</span>
+        <span><span style="display:inline-block;width:8px;height:8px;background:rgba(52,211,153,0.4);border-radius:2px;border:1px dashed rgba(52,211,153,0.8);margin-left:3px"></span>متوقع</span>
+        <span><span style="display:inline-block;width:8px;height:3px;background:rgba(96,165,250,0.6);border-radius:2px;margin-left:3px;margin-bottom:1px"></span>السنة السابقة</span>
+      </div>
     </div>
 
-    <!-- توزيع العملاء -->
-    <div class="charts-grid">
+    <!-- ═══ Forecast التحصيل القادم ═══ -->
+    <div class="chart-card" style="margin-bottom:12px;background:linear-gradient(135deg,var(--surface),rgba(52,211,153,0.04))">
+      <div class="chart-title">🔮 توقعات التحصيل — الأشهر القادمة</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
+        ${forecastMonths.map((m,i) => `
+          <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
+            <div style="font-size:0.62rem;color:var(--muted);margin-bottom:4px">${m.label}</div>
+            <div style="font-size:0.9rem;font-weight:800;color:var(--green)">${fmt(m.adjusted)}</div>
+            <div style="font-size:0.5rem;color:var(--muted);margin-top:2px">متوقع: ${fmt(m.expected)}</div>
+            <div style="height:4px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:6px">
+              <div style="height:100%;width:${m.expected>0?Math.round((m.adjusted/m.expected)*100):0}%;background:${['var(--green)','var(--accent2)','var(--blue)'][i]};border-radius:3px"></div>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div style="font-size:0.55rem;color:var(--muted);text-align:center;margin-top:8px">
+        <i class="fa-solid fa-circle-info"></i> التوقع مبني على معدل التحصيل التاريخي
+      </div>
+    </div>
+
+    <!-- ═══ توزيع العملاء + ربحية المحفظة ═══ -->
+    <div class="charts-grid" style="margin-bottom:12px">
       <div class="chart-card">
         <div class="chart-title">👥 توزيع العملاء</div>
         <div class="donut-wrap">
           <svg width="64" height="64" viewBox="0 0 64 64">
-            ${buildDonut([
-              {v:countOk, c:'#34d399'}, {v:countWarn, c:'#fb923c'},
-              {v:countBad, c:'#f87171'}, {v:countDone, c:'#6b6b8a'}
-            ])}
+            ${buildDonut([{v:countOk,c:'#34d399'},{v:countWarn,c:'#fb923c'},{v:countBad,c:'#f87171'},{v:countDone,c:'#6b6b8a'}])}
           </svg>
           <div class="donut-legend">
             <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#34d399"></div><span>منتظم (${countOk})</span></div>
@@ -4621,32 +4907,132 @@ function buildDashboard() {
           </div>
         </div>
       </div>
-
-      <!-- مقارنة الشهرين -->
       <div class="chart-card">
-        <div class="chart-title">📊 مقارنة الأشهر</div>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
-          ${monthlyCollection.slice(3).map((v,i) => `
-            <div>
-              <div style="display:flex;justify-content:space-between;font-size:0.58rem;color:var(--muted);margin-bottom:2px">
-                <span>${monthLabels[i+3]}</span><span>${fmt(v)}</span>
-              </div>
-              <div style="height:6px;background:var(--surface3);border-radius:4px;overflow:hidden">
-                <div style="height:100%;width:${Math.round((v/maxCol)*100)}%;background:${i===2?'var(--accent)':'rgba(124,107,255,0.4)'};border-radius:4px;transition:width 0.6s ease"></div>
-              </div>
-            </div>`).join('')}
+        <div class="chart-title">💰 الربحية</div>
+        <div style="text-align:center;padding:4px 0">
+          <div style="font-size:0.52rem;color:var(--muted)">الربح المتوقع الكلي</div>
+          <div style="font-size:1rem;font-weight:900;color:var(--green);margin:2px 0">${fmt(totalProfit)}</div>
+          <div style="font-size:0.52rem;color:var(--muted);margin-bottom:4px">محقق فعلاً: <b style="color:var(--accent2)">${fmt(Math.round(realizedProfit))}</b></div>
+          <div style="height:5px;background:var(--surface3);border-radius:4px;overflow:hidden;margin-bottom:6px">
+            <div style="height:100%;width:${Math.min(profitRate,100)}%;background:linear-gradient(90deg,var(--green),var(--accent2));border-radius:4px"></div>
+          </div>
+          <div style="font-size:0.5rem;color:var(--muted)">هامش: <b style="color:var(--accent2)">${profitRate}%</b></div>
         </div>
       </div>
     </div>
 
-    <!-- أعلى المنتجات -->
-    <div class="chart-card">
+    <!-- ═══ ربحية حسب المنتج ═══ -->
+    <div class="chart-card" style="margin-bottom:12px">
+      <div class="chart-title">💎 الربحية حسب المنتج</div>
+      <div style="display:flex;flex-direction:column;gap:7px;margin-top:6px">
+        ${topProdProfit.map(([name, data], i) => `
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:0.68rem;margin-bottom:3px">
+              <span style="font-weight:700;color:${i===0?'var(--accent2)':'var(--text)'}">${name} <span style="color:var(--muted);font-size:0.55rem">(${data.count} عميل)</span></span>
+              <span style="color:var(--green);font-weight:800">${fmt(data.profit)} ج</span>
+            </div>
+            <div style="display:flex;gap:3px;align-items:center">
+              <div style="flex:1;height:6px;background:var(--surface3);border-radius:4px;overflow:hidden">
+                <div style="height:100%;width:${Math.round((data.profit/topProdProfit[0][1].profit)*100)}%;background:${['var(--accent)','var(--accent2)','var(--blue)','var(--green)'][i]||'var(--muted)'};border-radius:4px;transition:width 0.6s ease"></div>
+              </div>
+              <span style="font-size:0.5rem;color:var(--muted);white-space:nowrap">${data.revenue>0?Math.round((data.profit/data.revenue)*100):0}%</span>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- ═══ أعمار الديون ═══ -->
+    <div class="chart-card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="chart-title" style="margin-bottom:0">⏳ أعمار المتأخرات</div>
+        ${badDebtRisk>0?`<div style="font-size:0.55rem;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:2px 8px;color:var(--red)">⚠️ ديون معدومة: ${badDebtRisk}%</div>`:''}
+      </div>
+      ${lateCustomers.length === 0
+        ? '<div style="text-align:center;color:var(--green);font-size:0.8rem;padding:12px">🎉 لا توجد متأخرات</div>'
+        : `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:4px">
+          ${[
+            {lbl:'1-7 أيام', count:debtAge.d7, amt:debtAge.amt7, clr:'var(--orange)'},
+            {lbl:'8-30 يوم', count:debtAge.d30, amt:debtAge.amt30, clr:'#f97316'},
+            {lbl:'31-60 يوم', count:debtAge.d60, amt:debtAge.amt60, clr:'var(--red)'},
+            {lbl:'+60 يوم ⚠️', count:debtAge.d60p, amt:debtAge.amt60p, clr:'#ef4444'},
+          ].map(({lbl,count,amt,clr}) => `
+            <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius2);padding:8px;text-align:center">
+              <div style="font-size:0.52rem;color:var(--muted);margin-bottom:3px">${lbl}</div>
+              <div style="font-size:1rem;font-weight:900;color:${clr}">${count}</div>
+              <div style="font-size:0.5rem;color:${clr};font-weight:700;margin-top:2px">${fmt(amt)}</div>
+              <div style="font-size:0.45rem;color:var(--muted)">ج.م</div>
+            </div>`).join('')}
+        </div>`}
+    </div>
+
+    <!-- ═══ قائمة المتأخرين ═══ -->
+    ${lateCustomers.length > 0 ? `
+    <div class="chart-card" style="margin-bottom:12px">
+      <div class="chart-title">🔴 المتأخرون — ${lateCustomers.length} عميل</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:220px;overflow-y:auto">
+        ${lateCustomers.sort((a,b)=>calculateDueAmount(b)-calculateDueAmount(a)).slice(0,10).map(c => {
+          const due = calculateDueAmount(c);
+          const ni  = (typeof calcNextInstallmentInfo==='function') ? calcNextInstallmentInfo(c) : null;
+          const days = ni ? (ni.daysLeft||0) : 0;
+          return `<div onclick="openCustomer(${c.id})" style="display:flex;justify-content:space-between;align-items:center;background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:8px 10px;cursor:pointer">
+            <div>
+              <div style="font-size:0.72rem;font-weight:700;color:var(--text)">${c.name}</div>
+              <div style="font-size:0.58rem;color:var(--muted)">${c.prod||''} · ${days} يوم تأخير</div>
+            </div>
+            <div style="text-align:left">
+              <div style="font-size:0.75rem;font-weight:800;color:var(--red)">${fmt(due)}</div>
+              <div style="font-size:0.5rem;color:var(--muted)">ج.م متأخر</div>
+            </div>
+          </div>`;
+        }).join('')}
+        ${lateCustomers.length > 10 ? `<div style="text-align:center;font-size:0.6rem;color:var(--muted);padding:4px">+ ${lateCustomers.length-10} آخرين</div>` : ''}
+      </div>
+    </div>` : ''}
+
+    <!-- ═══ معدل الالتزام ═══ -->
+    ${(worstCommit.length > 0 || bestCommit.length > 0) ? `
+    <div class="chart-card" style="margin-bottom:12px">
+      <div class="chart-title">📋 معدل الالتزام بالسداد</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        ${worstCommit.length > 0 ? `
+        <div>
+          <div style="font-size:0.6rem;color:var(--red);font-weight:700;margin-bottom:6px">الأقل التزاماً</div>
+          ${worstCommit.map(x => `
+          <div onclick="openCustomer(${x.id})" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;cursor:pointer">
+            <div style="font-size:0.62rem;color:var(--text);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:80px">${x.name}</div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <div style="width:40px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${x.rate}%;background:${x.rate<50?'var(--red)':x.rate<80?'var(--orange)':'var(--green)'};border-radius:3px"></div>
+              </div>
+              <div style="font-size:0.58rem;font-weight:700;color:${x.rate<50?'var(--red)':x.rate<80?'var(--orange)':'var(--green)'}">${x.rate}%</div>
+            </div>
+          </div>`).join('')}
+        </div>` : ''}
+        ${bestCommit.length > 0 ? `
+        <div>
+          <div style="font-size:0.6rem;color:var(--green);font-weight:700;margin-bottom:6px">الأكثر التزاماً ⭐</div>
+          ${bestCommit.map(x => `
+          <div onclick="openCustomer(${x.id})" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;cursor:pointer">
+            <div style="font-size:0.62rem;color:var(--text);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:80px">${x.name}</div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <div style="width:40px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:100%;background:var(--green);border-radius:3px"></div>
+              </div>
+              <div style="font-size:0.58rem;font-weight:700;color:var(--green)">100%</div>
+            </div>
+          </div>`).join('')}
+        </div>` : ''}
+      </div>
+    </div>` : ''}
+
+    <!-- ═══ أعلى المنتجات مبيعاً ═══ -->
+    <div class="chart-card" style="margin-bottom:12px">
       <div class="chart-title">🏆 أعلى المنتجات مبيعاً</div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+      <div style="display:flex;flex-direction:column;gap:7px;margin-top:6px">
         ${topProds.map(([name, count], i) => `
           <div>
-            <div style="display:flex;justify-content:space-between;font-size:0.72rem;margin-bottom:3px">
-              <span style="font-weight:700;color:${i===0?'var(--accent2)':'var(--text)'}">${i===0?'🥇 ':''}${name}</span>
+            <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-bottom:3px">
+              <span style="font-weight:700;color:${i===0?'var(--accent2)':'var(--text)'}">${i===0?'🥇 ':i===1?'🥈 ':i===2?'🥉 ':''} ${name}</span>
               <span style="color:var(--muted)">${count} عميل</span>
             </div>
             <div style="height:6px;background:var(--surface3);border-radius:4px;overflow:hidden">
@@ -4656,63 +5042,86 @@ function buildDashboard() {
       </div>
     </div>
 
-    <!-- إحصائيات الأيام 10 / 20 / 30 -->
-    <div class="chart-card" style="margin-top:12px">
+    <!-- ═══ هيت ماب أوقات الدفع ═══ -->
+    ${topPayDays.length > 0 ? `
+    <div class="chart-card" style="margin-bottom:12px">
+      <div class="chart-title">⏰ أكثر أيام الشهر نشاطاً للسداد</div>
+      <div style="display:flex;gap:6px;align-items:flex-end;margin-top:10px;flex-wrap:wrap">
+        ${topPayDays.map(({day,count,amt}) => `
+          <div class="payment-heatmap-cell" style="flex:1;min-width:30px">
+            <div style="font-size:0.5rem;color:var(--accent2);font-weight:700">${count}</div>
+            <div style="width:100%;height:${Math.round((count/maxPayCount)*50)+8}px;background:linear-gradient(180deg,var(--accent),var(--accent2));border-radius:4px 4px 0 0;opacity:${0.4+0.6*(count/maxPayCount)};min-height:8px"></div>
+            <div style="font-size:0.55rem;color:var(--muted);font-weight:700">${day}</div>
+            <div style="font-size:0.45rem;color:var(--muted)">${fmt(amt/1000).replace(',','.')}k</div>
+          </div>`).join('')}
+      </div>
+      <div style="font-size:0.55rem;color:var(--muted);text-align:center;margin-top:6px">يوم من الشهر · أفضل أوقات للمتابعة</div>
+    </div>` : ''}
+
+    <!-- ═══ أقساط الشهر القادم حسب يوم الاستحقاق ═══ -->
+    <div class="chart-card" style="margin-bottom:12px">
       <div class="chart-title">📅 أقساط الشهر القادم — حسب يوم الاستحقاق</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
         ${[{day:10,data:day10,color:'var(--blue)'},{day:20,data:day20,color:'var(--accent)'},{day:30,data:day30,color:'var(--orange)'}].map(({day,data,color}) => `
-          <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius2);padding:10px;text-align:center;position:relative;overflow:hidden">
+          <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius2);padding:10px;text-align:center">
             <div style="font-size:1.1rem;font-weight:900;color:${color}">يوم ${day}</div>
-            <div style="font-size:0.6rem;color:var(--muted);margin:2px 0 6px">الشهر القادم</div>
-            <div style="font-size:0.85rem;font-weight:800;color:var(--text)">${fmt(data.totalMonthly)}</div>
-            <div style="font-size:0.55rem;color:var(--muted);margin-bottom:6px">متوقع التحصيل</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:0.58rem">
+            <div style="font-size:0.85rem;font-weight:800;color:var(--text);margin:4px 0">${fmt(data.totalMonthly)}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:0.56rem;margin-bottom:4px">
               <div style="background:rgba(52,211,153,0.1);border-radius:4px;padding:3px;color:var(--green)">✅ ${data.ok}</div>
               <div style="background:rgba(248,113,113,0.1);border-radius:4px;padding:3px;color:var(--red)">❌ ${data.late}</div>
               <div style="background:rgba(251,146,60,0.1);border-radius:4px;padding:3px;color:var(--orange)">⚠️ ${data.warn}</div>
               <div style="background:rgba(107,107,138,0.1);border-radius:4px;padding:3px;color:var(--muted)">✓ ${data.done}</div>
             </div>
-            ${data.due > 0 ? `<div style="margin-top:6px;font-size:0.6rem;background:rgba(248,113,113,0.1);border-radius:4px;padding:3px;color:var(--red);font-weight:700">متأخر: ${fmt(data.due)}</div>` : `<div style="margin-top:6px;font-size:0.6rem;background:rgba(52,211,153,0.1);border-radius:4px;padding:3px;color:var(--green)">لا متأخرات 🎉</div>`}
-            <div style="font-size:0.58rem;color:var(--muted);margin-top:4px">${data.count} عميل</div>
+            ${data.due > 0 ? `<div style="font-size:0.55rem;background:rgba(248,113,113,0.1);border-radius:4px;padding:3px;color:var(--red);font-weight:700">متأخر: ${fmt(data.due)}</div>` : `<div style="font-size:0.55rem;background:rgba(52,211,153,0.1);border-radius:4px;padding:3px;color:var(--green)">لا متأخرات 🎉</div>`}
+            <div style="font-size:0.55rem;color:var(--muted);margin-top:4px">${data.count} عميل</div>
           </div>
         `).join('')}
       </div>
     </div>
 
-    <!-- إحصائيات عامة إضافية -->
-    <div class="chart-card" style="margin-top:12px">
+    <!-- ═══ إحصائيات المحفظة الكاملة ═══ -->
+    <div class="chart-card">
       <div class="chart-title">📊 إحصائيات المحفظة الكاملة</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
         <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
-          <div style="font-size:0.58rem;color:var(--muted)">نسبة التحصيل الكلية</div>
-          <div style="font-size:1.2rem;font-weight:900;color:${collectionRate>=80?'var(--green)':collectionRate>=50?'var(--orange)':'var(--red)'}">${collectionRate}%</div>
+          <div style="font-size:0.55rem;color:var(--muted)">نسبة التحصيل الكلية</div>
+          <div style="font-size:1.1rem;font-weight:900;color:${collectionRate>=80?'var(--green)':collectionRate>=50?'var(--orange)':'var(--red)'}">${collectionRate}%</div>
           <div style="height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:4px">
-            <div style="height:100%;width:${collectionRate}%;background:${collectionRate>=80?'var(--green)':collectionRate>=50?'var(--orange)':'var(--red)'};border-radius:3px;transition:width 0.8s"></div>
+            <div style="height:100%;width:${collectionRate}%;background:${collectionRate>=80?'var(--green)':collectionRate>=50?'var(--orange)':'var(--red)'};border-radius:3px"></div>
           </div>
         </div>
         <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
-          <div style="font-size:0.58rem;color:var(--muted)">إجمالي المحفظة</div>
+          <div style="font-size:0.55rem;color:var(--muted)">إجمالي المحفظة</div>
           <div style="font-size:0.85rem;font-weight:800;color:var(--accent2)">${fmt(totalPortfolio)}</div>
-          <div style="font-size:0.55rem;color:var(--muted);margin-top:2px">محصّل: ${fmt(totalCollectedAll)}</div>
+          <div style="font-size:0.5rem;color:var(--muted);margin-top:2px">محصّل: ${fmt(totalCollectedAll)}</div>
         </div>
         <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
-          <div style="font-size:0.58rem;color:var(--muted)">متوسط القسط الشهري</div>
+          <div style="font-size:0.55rem;color:var(--muted)">متوسط القسط / عميل</div>
           <div style="font-size:1rem;font-weight:800;color:var(--blue)">${fmt(avgMonthly)}</div>
-          <div style="font-size:0.55rem;color:var(--muted);margin-top:2px">لكل عميل نشط</div>
         </div>
         <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
-          <div style="font-size:0.58rem;color:var(--muted)">العقود المكتملة</div>
+          <div style="font-size:0.55rem;color:var(--muted)">العقود المكتملة</div>
           <div style="font-size:1rem;font-weight:800;color:var(--green)">${completedContracts}</div>
-          <div style="font-size:0.55rem;color:var(--muted);margin-top:2px">من أصل ${totalContracts + completedContracts} عقد</div>
+          <div style="font-size:0.5rem;color:var(--muted);margin-top:2px">من ${totalContracts+completedContracts} إجمالي</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
+          <div style="font-size:0.55rem;color:var(--muted)">متوسط مدة العقود</div>
+          <div style="font-size:1rem;font-weight:800;color:var(--pink)">${avgMonths} شهر</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;text-align:center">
+          <div style="font-size:0.55rem;color:var(--muted)">نسبة الخطر</div>
+          <div style="font-size:1rem;font-weight:800;color:${riskRate<=5?'var(--green)':riskRate<=15?'var(--orange)':'var(--red)'}">${riskRate}%</div>
+          <div style="font-size:0.5rem;color:var(--muted);margin-top:2px">من إجمالي المحفظة</div>
         </div>
         <div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:var(--radius);padding:10px;text-align:center;grid-column:span 2">
-          <div style="font-size:0.58rem;color:var(--red)">⚠️ إجمالي المتأخرات الآن</div>
+          <div style="font-size:0.55rem;color:var(--red)">⚠️ إجمالي المتأخرات الآن</div>
           <div style="font-size:1.1rem;font-weight:900;color:var(--red)">${fmt(totalDueNow)} ج.م</div>
-          <div style="font-size:0.55rem;color:var(--muted);margin-top:2px">على ${customers.filter(c=>!c.archived && calculateDueAmount(c)>0).length} عميل</div>
+          <div style="font-size:0.5rem;color:var(--muted);margin-top:2px">على ${lateCustomers.length} عميل</div>
         </div>
       </div>
     </div>
   `;
+  if(keepScroll && container.parentElement) container.parentElement.scrollTop = scrollTop;
 }
 
 function buildDonut(segments) {
@@ -5039,6 +5448,8 @@ window.openEditLog = openEditLog;
 window.renderEditLog = renderEditLog;
 window.clearEditLog = clearEditLog;
 window.openDashboard = openDashboard;
+window.setDashPeriod = setDashPeriod;
+window.exportDashboardWhatsApp = exportDashboardWhatsApp;
 window.unlockScreen = unlockScreen;
 window.openBroadcast = openBroadcast;
 window.selectBcType = selectBcType;
