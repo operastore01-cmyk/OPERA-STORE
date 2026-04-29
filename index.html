@@ -1396,12 +1396,34 @@ input, textarea, select { font-size: 0.88rem !important; }
         <select id="due-day"><option value="10">يوم 10</option><option value="20">يوم 20</option><option value="30">يوم 30</option></select>
       </div>
       <div class="field"><label>التكلفة</label><input type="number" id="buy-price" placeholder="0"></div>
-      <div class="field"><label>سعر الكاش</label><input type="number" id="sell-price" placeholder="0"></div>
-      <div class="field"><label>إجمالي القسط</label><input type="number" id="inst-total" oninput="autoCalc()" placeholder="0"></div>
-      <div class="field"><label>المقدم</label><input type="number" id="down-payment" oninput="autoCalc()" placeholder="0"></div>
-      <div class="field"><label>القسط الشهري</label><input type="number" id="monthly-val" oninput="autoCalc()" placeholder="0"></div>
+      <div class="field"><label>سعر الكاش</label><input type="number" id="sell-price" placeholder="0" oninput="smartAutoCalc()"></div>
+      <div class="field"><label>المقدم</label><input type="number" id="down-payment" placeholder="0" oninput="smartAutoCalc()"></div>
+      <div class="field"><label>عدد الشهور</label><input type="number" id="months-input" placeholder="12" min="1" max="36" oninput="smartAutoCalc()"></div>
     </div>
-    <div class="field"><label>المدة المتوقعة</label><input type="text" id="months-count" readonly style="background:transparent;border-color:transparent;color:var(--accent2);font-weight:800"></div>
+
+    <!-- نتيجة الحساب التلقائي -->
+    <div id="smart-calc-result" style="display:none;background:linear-gradient(135deg,rgba(124,107,255,0.1),rgba(167,139,250,0.06));border:1px solid rgba(124,107,255,0.3);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;animation:fadeIn 0.3s ease">
+      <div style="font-size:0.68rem;color:var(--accent2);font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-calculator"></i> نتيجة الحساب التلقائي</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center">
+        <div style="background:var(--surface3);border-radius:10px;padding:10px 6px">
+          <div style="font-size:0.58rem;color:var(--muted);margin-bottom:4px">القسط الشهري</div>
+          <div id="calc-monthly" style="font-size:1.1rem;font-weight:900;color:var(--green)">0 ج</div>
+        </div>
+        <div style="background:var(--surface3);border-radius:10px;padding:10px 6px">
+          <div style="font-size:0.58rem;color:var(--muted);margin-bottom:4px">إجمالي التقسيط</div>
+          <div id="calc-total" style="font-size:1.1rem;font-weight:900;color:var(--accent2)">0 ج</div>
+        </div>
+      </div>
+      <!-- حقل مخفي للنسبة — للاستخدام الداخلي فقط -->
+      <div id="calc-rate" style="display:none">0</div>
+      <div style="margin-top:8px;padding:8px 12px;background:var(--surface3);border-radius:8px;font-size:0.7rem;color:var(--muted);text-align:center" id="calc-summary"></div>
+    </div>
+
+    <!-- حقول مخفية للحفظ -->
+    <input type="hidden" id="inst-total">
+    <input type="hidden" id="monthly-val">
+    <input type="hidden" id="months-count">
+
     <button class="btn btn-green" onclick="saveCustomer()"><i class="fa-solid fa-check"></i> إنشاء الحساب</button>
   </div>
 </div>
@@ -1436,23 +1458,19 @@ input, textarea, select { font-size: 0.88rem !important; }
       <div class="back-btn" style="margin-bottom:0" onclick="closeM('settle-modal')">رجوع</div>
       <button onclick="closeM('settle-modal')" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
-    <div class="modal-title" style="margin-bottom:14px">🤝 حاسبة السداد المبكر</div>
+    <div class="modal-title" style="margin-bottom:14px">🤝 حاسبة السداد المبكر (تكيش)</div>
 
-    <!-- بيانات العميل (للعرض فقط) -->
+    <!-- بيانات العميل -->
     <div id="settle-info-bar" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:0.72rem;color:var(--muted);line-height:1.9"></div>
-
-    <!-- نسبة الربح الشهرية (قابلة للتعديل) -->
-    <div class="field" style="margin-bottom:10px">
-      <label style="font-size:0.72rem">نسبة الربح الشهرية (%) <small style="color:var(--muted)">- عدّلها إذا لزم</small></label>
-      <input type="number" id="settle-profit-rate" placeholder="5" value="5" step="0.5" oninput="calcEarlySettlement()" style="min-height:38px">
-    </div>
 
     <!-- نتائج الحساب -->
     <div id="settle-results" style="display:none;animation:fadeIn 0.3s ease">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px" id="settle-cards-grid"></div>
-      <div style="background:linear-gradient(135deg,rgba(251,146,60,0.12),rgba(248,113,113,0.08));border:1px solid rgba(251,146,60,0.25);border-radius:var(--radius);padding:12px;margin-bottom:12px;text-align:center">
-        <div style="font-size:0.6rem;color:var(--muted);margin-bottom:3px">إجمالي المطلوب للسداد المبكر</div>
-        <div id="settle-total-today" style="font-size:1.4rem;font-weight:900;color:var(--orange)">0 ج.م</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px" id="settle-cards-grid"></div>
+
+      <!-- المبلغ الإجمالي -->
+      <div style="background:linear-gradient(135deg,rgba(251,146,60,0.12),rgba(248,113,113,0.08));border:1px solid rgba(251,146,60,0.3);border-radius:var(--radius);padding:14px;margin-bottom:12px;text-align:center">
+        <div style="font-size:0.6rem;color:var(--muted);margin-bottom:4px">إجمالي المطلوب للتكيش</div>
+        <div id="settle-total-today" style="font-size:1.6rem;font-weight:900;color:var(--orange)">0 ج.م</div>
         <div id="settle-saving-note" style="font-size:0.62rem;color:var(--green);margin-top:4px"></div>
       </div>
 
@@ -1464,12 +1482,12 @@ input, textarea, select { font-size: 0.88rem !important; }
       <button class="btn" style="background:var(--orange);color:#1a0a00;width:100%;margin-bottom:6px" onclick="processEarlySettlement()">
         <i class="fa-solid fa-handshake"></i> تأكيد السداد والتسوية
       </button>
-      <p style="font-size:0.62rem;color:var(--muted);text-align:center;line-height:1.7">سيتم تسجيل المبلغ المستلم وإسقاط باقي المديونية تلقائياً من الأرباح.</p>
+      <p style="font-size:0.62rem;color:var(--muted);text-align:center;line-height:1.7">سيتم تسجيل المبلغ المستلم وإسقاط باقي المديونية تلقائياً.</p>
     </div>
 
     <div id="settle-loading" style="text-align:center;padding:20px;color:var(--muted);font-size:0.8rem">
       <i class="fa-solid fa-calculator" style="font-size:1.5rem;margin-bottom:8px;display:block;color:var(--accent2)"></i>
-      أدخل نسبة الربح لعرض النتائج
+      جاري الحساب...
     </div>
   </div>
 </div>
@@ -1754,6 +1772,10 @@ input, textarea, select { font-size: 0.88rem !important; }
         <div class="ic-detail-line"><span>مجموع الأقساط:</span><b id="ic-total-inst">0</b></div>
         <div class="ic-detail-line"><span>الإجمالي (بالمقدم):</span><b id="ic-full-price" style="color:var(--accent2)">0</b></div>
       </div>
+      <!-- زر إنشاء عقد -->
+      <button class="chip-btn" style="width:100%;background:linear-gradient(135deg,var(--green),#059669);color:#fff;border-color:var(--green);font-size:0.82rem;font-weight:800;margin-bottom:8px" onclick="icCreateContract()">
+        <i class="fa-solid fa-file-contract"></i> إنشاء عقد لهذا العميل
+      </button>
       <div class="ic-action-bar">
         <button class="chip-btn" style="background:var(--red);color:#fff;border-color:var(--red);flex-shrink:0" onclick="icReset()"><i class="fa-solid fa-xmark"></i></button>
         <button class="chip-btn" style="background:#25D366;color:#fff;border-color:#25D366;flex:1;font-size:0.78rem" onclick="icSendCustomer()"><i class="fa-brands fa-whatsapp"></i> للعميل</button>
@@ -1836,7 +1858,7 @@ input, textarea, select { font-size: 0.88rem !important; }
   </button>
 
   <!-- وسط: زر + -->
-  <button class="nav-fab" onclick="openM('add-modal')" id="add-cust-btn" title="إضافة عميل جديد">
+  <button class="nav-fab" onclick="openAddModal()" id="add-cust-btn" title="إضافة عميل جديد">
     <span style="font-size:1.6rem;line-height:1;margin-top:-1px">+</span>
   </button>
 
@@ -2773,10 +2795,42 @@ function saveSavings() {
 }
 
 function autoCalc() {
-  const t = parseFloat(document.getElementById('inst-total').value) || 0;
-  const d = parseFloat(document.getElementById('down-payment').value) || 0;
-  const m = parseFloat(document.getElementById('monthly-val').value) || 0;
-  if(m > 0) document.getElementById('months-count').value = Math.ceil((t-d)/m) + " شهر تقريباً";
+  // legacy — not used anymore
+}
+
+function r5Up(n) {
+  // تقريب لأقرب 5 للأعلى
+  return Math.ceil(n / 5) * 5;
+}
+
+function smartAutoCalc() {
+  const cashPrice = parseFloat(document.getElementById('sell-price').value) || 0;
+  const down      = parseFloat(document.getElementById('down-payment').value) || 0;
+  const months    = parseInt(document.getElementById('months-input').value) || 0;
+  const resultBox = document.getElementById('smart-calc-result');
+
+  if(!cashPrice || !months) { resultBox.style.display = 'none'; return; }
+
+  const base       = cashPrice - down;           // المبلغ المراد تقسيطه
+  const ratePercent = months * 5;                // 5% لكل شهر
+  const withInterest = base + base * (ratePercent / 100);
+  const monthlyRaw   = withInterest / months;
+  const monthly      = r5Up(monthlyRaw);         // تقريب لأقرب 5 للأعلى
+  const totalInst    = monthly * months;         // إجمالي التقسيط (بدون المقدم)
+  const grandTotal   = totalInst + down;         // إجمالي كل حاجة
+
+  // تحديث الحقول المخفية
+  document.getElementById('inst-total').value  = grandTotal;
+  document.getElementById('monthly-val').value = monthly;
+  document.getElementById('months-count').value = months + ' شهر';
+
+  // عرض النتيجة — أرقام إنجليزي، بدون رمز % أو كلمة فائدة
+  resultBox.style.display = 'block';
+  document.getElementById('calc-rate').textContent    = ratePercent;  // مخفي — للاستخدام الداخلي
+  document.getElementById('calc-monthly').textContent = monthly.toLocaleString('en-EG') + ' ج';
+  document.getElementById('calc-total').textContent   = grandTotal.toLocaleString('en-EG') + ' ج';
+  document.getElementById('calc-summary').innerHTML   =
+    `كاش <b>${cashPrice.toLocaleString('en-EG')}</b> — مقدم <b>${down.toLocaleString('en-EG')}</b> — قسط <b>${monthly.toLocaleString('en-EG')}</b> × ${months} شهر`;
 }
 
 function filterByDay(day) {
@@ -2785,12 +2839,18 @@ function filterByDay(day) {
   render();
 }
 
+// ===== مساعد: تاريخ استحقاق آمن بدون overflow =====
+function safeDueDate(year, month, day) {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, Math.min(day, lastDay));
+}
+
 function calculateDueAmount(c) {
   if(!c.receiveDate) return 0;
   const start = new Date(c.receiveDate), today = new Date();
-  let first = new Date(start.getFullYear(), start.getMonth(), c.dueDay);
-  if(first < start) first.setMonth(first.getMonth()+1);
-  if((first-start)/(1000*3600*24) < 20) first.setMonth(first.getMonth()+1);
+  let first = safeDueDate(start.getFullYear(), start.getMonth(), c.dueDay);
+  if(first < start) first = safeDueDate(first.getFullYear(), first.getMonth() + 1, c.dueDay);
+  if((first-start)/(1000*3600*24) < 20) first = safeDueDate(first.getFullYear(), first.getMonth() + 1, c.dueDay);
   if(today < first) return 0;
   let mp = (today.getFullYear()-first.getFullYear())*12+(today.getMonth()-first.getMonth());
   if(today.getDate() >= c.dueDay) mp += 1; else mp = Math.max(0,mp);
@@ -2932,13 +2992,26 @@ function render() {
   }
 }
 
+function openAddModal() {
+  openM('add-modal');
+  // تاريخ اليوم تلقائياً لو الحقل فاضي
+  setTimeout(() => {
+    const el = document.getElementById('receive-date');
+    if(el && !el.value) {
+      const t = new Date();
+      el.value = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    }
+  }, 50);
+}
+
 function saveCustomer() {
   if(!hasPermission('canAdd') && !currentUser.isAdmin) {
     showToast('ليس لديك صلاحية لإضافة عملاء', 'error', 'fa-lock');
     return;
   }
-  const n = document.getElementById('cust-name').value, it = document.getElementById('inst-total').value;
-  if(!n || !it) { showToast('برجاء إكمال الاسم وإجمالي القسط','error','fa-exclamation-circle'); return; }
+  const n  = document.getElementById('cust-name').value;
+  const it = document.getElementById('inst-total').value;
+  if(!n || !it) { showToast('برجاء إكمال بيانات العميل والحساب','error','fa-exclamation-circle'); return; }
   const c = {
     id:Date.now(), lastActionDate:Date.now(), name:n,
     custCode: genCustCode(),
@@ -2956,7 +3029,8 @@ function saveCustomer() {
   };
   customers.push(c); save(); closeM('add-modal');
   logEdit('إضافة عميل', c.name, `${fmt(c.total)} ج.م — ${c.prod||''}`);
-  ['cust-name','cust-phone','prod-name','buy-price','sell-price','inst-total','down-payment','monthly-val','receive-date','months-count'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['cust-name','cust-phone','prod-name','buy-price','sell-price','down-payment','months-input','inst-total','monthly-val','receive-date','months-count'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('smart-calc-result').style.display = 'none';
   render();
   showToast(`تم إضافة ${n} بنجاح`);
 }
@@ -3069,70 +3143,66 @@ function openPaymentModal(id) {
 }
 
 function openSettleModal() {
-  // reset
   document.getElementById('settle-results').style.display = 'none';
   document.getElementById('settle-loading').style.display = 'block';
-  document.getElementById('settle-profit-rate').value = '5';
   document.getElementById('settle-amount').value = '';
   openM('settle-modal');
-  // احسب تلقائياً بعد فتح المودال
   setTimeout(calcEarlySettlement, 80);
 }
 
 function calcEarlySettlement() {
   const c = customers.find(x => x.id === activeCustomerId); if(!c) return;
 
-  const r = parseFloat(document.getElementById('settle-profit-rate').value);
-  if(isNaN(r) || r < 0) {
-    document.getElementById('settle-results').style.display = 'none';
-    document.getElementById('settle-loading').style.display = 'block';
-    return;
-  }
+  // ===== المنطق الصحيح =====
+  // الأصل = سعر الكاش - المقدم (مش إجمالي التقسيط)
+  const cashPrice    = c.sell  || c.total || 0;   // سعر الكاش المحفوظ في c.sell
+  const totalInst    = c.total || 0;               // إجمالي التقسيط (للمقارنة فقط)
+  const down         = c.down  || 0;
+  const monthly      = c.monthly || 0;
+  const principal    = cashPrice - down;            // الأصل الحقيقي = كاش ناقص مقدم
+  const paid         = c.payments.reduce((s,p) => s + p.amount, 0);
+  const ed           = c.earlyDiscount || 0;
 
-  // بيانات العميل
-  const totalContract = c.total;           // إجمالي مبلغ العقد
-  const down = c.down || 0;               // المقدم
-  const monthly = c.monthly || 0;
-  const N = monthly > 0 ? Math.ceil((totalContract - down) / monthly) : 0; // إجمالي الشهور
-  const paid = c.payments.reduce((s,p) => s+p.amount, 0);
-  const ed = c.earlyDiscount || 0;
+  // عدد الشهور التي مرت فعلياً (من تاريخ الاستلام)
+  const monthsPassed = c.receiveDate
+    ? Math.max(0, Math.floor((Date.now() - new Date(c.receiveDate).getTime()) / (1000*60*60*24*30.44)))
+    : 0;
 
-  // الشهور المدفوعة والمتأخرة
-  const paidMonths = monthly > 0 ? Math.floor((paid + ed) / monthly) : 0;
-  const due = calculateDueAmount(c);
-  const lateMonths = monthly > 0 ? Math.ceil(due / monthly) : 0;
-  const remainingMonths = Math.max(0, N - paidMonths - lateMonths);
+  // فائدة الشهور اللي مرت = الأصل × 5% × عدد الشهور — بحد أدنى 15%
+  const rawRate      = 0.05 * monthsPassed;
+  const effectiveRate = Math.max(0.15, rawRate);   // مينفعش أقل من 15%
+  const interest     = principal * effectiveRate;
 
-  // حساب سعر الكاش (أصل المنتج بدون أرباح)
-  const financedCash = N > 0 && r > 0 ? totalContract / (1 + (r / 100) * N) : (totalContract - down);
-  const cashPrice = financedCash + down;
-  const principalPerMonth = N > 0 ? cashPrice / N : 0;
+  // المطلوب للتكيش = (الأصل + فائدة الماضي) - اللي دفعه فعلاً
+  const finalAmount  = Math.max(0, (principal + interest) - paid);
 
-  // المتأخرات (بقيمة القسط كامل)
-  const lateAmount = monthly * lateMonths;
+  // المتأخرات
+  const due          = calculateDueAmount(c);
+  const lateMonths   = monthly > 0 ? Math.ceil(due / monthly) : 0;
 
-  // السداد المبكر = أصل الأقساط المتبقية فقط
-  const earlySettlement = principalPerMonth * remainingMonths;
-  const fullRemaining = monthly * remainingMonths;
-  const discount = fullRemaining - earlySettlement;
-  const totalToday = lateAmount + earlySettlement;
-  const saving = (totalContract - down - paid - ed) - totalToday;
+  // وفر مقارنة بلو استمر (المتبقي من إجمالي التقسيط)
+  const itc          = totalInst - down - ed;
+  const remaining    = Math.max(0, itc - paid);
+  const saving       = Math.max(0, remaining - finalAmount);
 
-  // عرض بار المعلومات
+  // بار معلومات العميل
   document.getElementById('settle-info-bar').innerHTML =
     `<span style="color:var(--accent2);font-weight:700">${c.name}</span> &nbsp;·&nbsp; ${c.prod} &nbsp;·&nbsp; قسط: <b style="color:var(--text)">${fmt(monthly)}</b> &nbsp;·&nbsp; يوم ${c.dueDay}` +
-    `<br>إجمالي العقد: <b style="color:var(--text)">${fmt(totalContract)}</b> &nbsp;·&nbsp; المقدم: <b>${fmt(down)}</b> &nbsp;·&nbsp; مدفوع: <b style="color:var(--green)">${fmt(paid)}</b>` +
+    `<br>كاش: <b style="color:var(--blue)">${fmt(cashPrice)}</b> &nbsp;·&nbsp; مقدم: <b>${fmt(down)}</b> &nbsp;·&nbsp; الأصل: <b style="color:var(--accent2)">${fmt(principal)}</b> &nbsp;·&nbsp; مدفوع: <b style="color:var(--green)">${fmt(paid)}</b> &nbsp;·&nbsp; شهور: <b>${monthsPassed}</b>` +
+    `&nbsp;·&nbsp; زيادة مطبقة: <b style="color:var(--orange)">${Math.round(effectiveRate*100)} من المئة</b>` +
+    (effectiveRate > rawRate ? ` <span style="font-size:0.6rem;color:var(--muted)">(حد أدنى)</span>` : '') +
     (lateMonths > 0 ? `&nbsp;·&nbsp; <span style="color:var(--red)">متأخر ${lateMonths} شهر</span>` : '');
 
   // بطاقات النتائج
   const cards = [
-    { lbl: 'سعر الكاش (الأصل)', val: fmt(cashPrice), color: 'var(--blue)' },
-    { lbl: 'القسط الشهري', val: fmt(monthly), color: 'var(--text)' },
-    { lbl: `متأخرات (${lateMonths} شهر)`, val: fmt(lateAmount), color: lateAmount > 0 ? 'var(--red)' : 'var(--muted)' },
-    { lbl: `سداد مبكر (${remainingMonths} شهر)`, val: fmt(earlySettlement), color: 'var(--orange)' },
-    { lbl: 'خصم الأرباح (التعجيل)', val: fmt(discount), color: 'var(--green)' },
-    { lbl: 'لو استمر التقسيط', val: fmt(fullRemaining), color: 'var(--muted)' },
+    { lbl: 'سعر الكاش',                  val: fmt(cashPrice),   color: 'var(--blue)'  },
+    { lbl: 'الأصل (كاش − المقدم)',       val: fmt(principal),   color: 'var(--accent2)'},
+    { lbl: 'شهور مرت فعلياً',            val: monthsPassed + ' شهر', color: 'var(--text)' },
+    { lbl: 'الزيادة المحتسبة', val: fmt(interest),   color: 'var(--orange)'},
+    { lbl: 'إجمالي مدفوع',               val: fmt(paid),        color: 'var(--green)' },
+    { lbl: 'وفر بالتكيش',               val: fmt(saving),      color: saving>0 ? 'var(--green)' : 'var(--muted)' },
   ];
+
   document.getElementById('settle-cards-grid').innerHTML = cards.map(cd =>
     `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-height:52px;display:flex;flex-direction:column;justify-content:center">
       <div style="font-size:0.55rem;color:var(--muted);margin-bottom:2px">${cd.lbl}</div>
@@ -3140,11 +3210,9 @@ function calcEarlySettlement() {
     </div>`
   ).join('');
 
-  document.getElementById('settle-total-today').textContent = fmt(totalToday) + ' ج.م';
+  document.getElementById('settle-total-today').textContent = fmt(finalAmount) + ' ج.م';
   document.getElementById('settle-saving-note').textContent = saving > 0 ? `وفر ${fmt(saving)} ج.م مقارنة باستكمال التقسيط` : '';
-
-  // ضع المبلغ المحسوب في خانة التأكيد تلقائياً
-  document.getElementById('settle-amount').value = Math.round(totalToday);
+  document.getElementById('settle-amount').value = Math.round(finalAmount);
 
   document.getElementById('settle-results').style.display = 'block';
   document.getElementById('settle-loading').style.display = 'none';
@@ -3359,8 +3427,8 @@ function alertUpcomingDue(id) {
   }
   const c = customers.find(x => x.id===id); if(!c) return;
   const now = new Date(); now.setHours(0,0,0,0);
-  let t = new Date(now.getFullYear(), now.getMonth(), c.dueDay);
-  if(now.getDate() > c.dueDay) t.setMonth(t.getMonth()+1);
+  let t = safeDueDate(now.getFullYear(), now.getMonth(), c.dueDay);
+  if(now.getDate() > c.dueDay) t = safeDueDate(t.getFullYear(), t.getMonth() + 1, c.dueDay);
   const diff = Math.ceil((t-now)/(1000*60*60*24)), due = calculateDueAmount(c);
   window.open(`https://wa.me/2${c.phone}?text=العميل: ${c.name}%0Aتنبيه بموعد القسط القادم لـ (${c.prod})%0Aبتاريخ ${t.getDate()}/${t.getMonth()+1}/${t.getFullYear()} (متبقي ${diff} يومًا)%0Aقيمة القسط: ${fmt(c.monthly)} ج.م%0Aومتأخرات سابقة: ${fmt(due)} ج.م`,'_blank');
 }
@@ -4674,7 +4742,7 @@ function initKeyboardShortcuts() {
 
     if(e.ctrlKey || e.metaKey) {
       switch(e.key) {
-        case 'n': e.preventDefault(); if(currentUser.isAdmin || hasPermission('canAdd')) openM('add-modal'); break;
+        case 'n': e.preventDefault(); if(currentUser.isAdmin || hasPermission('canAdd')) openAddModal(); break;
         case 'f': e.preventDefault(); document.getElementById('search').focus(); break;
         case 'r': e.preventDefault(); if(currentUser.isAdmin) openM('report-modal'); break;
         case 'd': e.preventDefault(); openDashboard(); break;
@@ -4927,6 +4995,7 @@ window.addSavingsAccount = addSavingsAccount;
 window.processSavingsOp = processSavingsOp;
 window.deleteSavingsAccount = deleteSavingsAccount;
 window.autoCalc = autoCalc;
+window.smartAutoCalc = smartAutoCalc;
 window.saveCustomer = saveCustomer;
 window.openEditModal = openEditModal;
 window.updateCustomerInfo = updateCustomerInfo;
@@ -5435,6 +5504,49 @@ function icReset() {
   document.getElementById('ic-res-box').style.display = 'none';
   [3,6,12].forEach(x => { const b=document.getElementById('ic-btn-'+x); if(b) b.classList.remove('active'); });
   icCurrent = { m:0, p:0, w:0 };
+}
+
+function icCreateContract() {
+  // التحقق من وجود حسبة
+  if(!icCurrent.m || icCurrent.m === 0) {
+    showToast('احسب الأقساط أولاً', 'error', 'fa-exclamation'); return;
+  }
+  const base = parseFloat(document.getElementById('ic-base-price').value) || 0;
+  const up   = parseFloat(document.getElementById('ic-upfront').value)   || 0;
+  const name = document.getElementById('ic-cust-name').value.trim();
+  const prod = document.getElementById('ic-prod-type').value.trim();
+  const m    = icCurrent.m;
+
+  // حساب القيم
+  const rates   = icGetRates();
+  const rate    = rates[m] !== undefined ? rates[m] : m * 5;
+  const rem     = base - up;
+  const intr    = rem * (rate / 100);
+  const mon     = icR5((rem + intr) / m);
+  const instTot = mon * m;
+  const fullPrc = instTot + up;
+
+  // إغلاق حاسبة الأقساط وفتح نافذة الإضافة
+  closeM('inst-calc-modal');
+  openM('add-modal');
+
+  // ملء البيانات تلقائياً بعد لحظة (بعد ما الـ modal يتفتح)
+  setTimeout(() => {
+    if(name) document.getElementById('cust-name').value  = name;
+    if(prod) document.getElementById('prod-name').value  = prod;
+    document.getElementById('sell-price').value    = base;
+    document.getElementById('down-payment').value  = up;
+    document.getElementById('months-input').value  = m;
+    // تاريخ النهارده
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm   = String(today.getMonth()+1).padStart(2,'0');
+    const dd   = String(today.getDate()).padStart(2,'0');
+    document.getElementById('receive-date').value  = `${yyyy}-${mm}-${dd}`;
+    // تشغيل الحساب لملء الحقول المخفية
+    smartAutoCalc();
+    showToast('تم نقل البيانات — راجع وأكمل', 'success', 'fa-check');
+  }, 150);
 }
 
 function icGetFirstInstDate() {
