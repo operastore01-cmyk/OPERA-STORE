@@ -3456,9 +3456,12 @@ function render() {
     document.getElementById('report-active-filter').innerText = currentDayFilter ? `نتائج عملاء يوم: ${currentDayFilter}` : 'النتائج الإجمالية لكافة العملاء';
     let totalSP=0, totalIP=0;
     customers.forEach(c => {
-      totalSP += (c.sell>0) ? (c.sell-c.buy) : 0;
-      let bip = (c.sell>0) ? (c.total-c.sell) : (c.total-c.buy);
-      totalIP += (bip-(c.earlyDiscount||0));
+      if(!c.total || c.total <= 0) return; // تجاهل العملاء بدون عقد حقيقي
+      const cBuy  = c.buy  || 0;
+      const cSell = c.sell || 0;
+      totalSP += (cSell > 0) ? (cSell - cBuy) : 0;
+      let bip = (cSell > 0) ? (c.total - cSell) : (c.total - cBuy);
+      totalIP += (bip - (c.earlyDiscount || 0));
     });
     const stats = [
       {l:'إجمالي السوق',v:mktNet,sub:mktNet-totalD,c:'var(--blue)'},
