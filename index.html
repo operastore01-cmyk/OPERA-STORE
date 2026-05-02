@@ -4062,28 +4062,47 @@ function sendWA(phone,name,amount,rem,ref='') {
   }
   const today   = new Date();
   const dateStr = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
-  const refLine = ref ? `\nرقم العملية: #${ref}` : '';
 
-  // جيب بيانات العميل كاملة لملء القالب بشكل صحيح
-  const cust = customers.find(x => (x.phone||'').replace(/\D/g,'') === (phone||'').replace(/\D/g,''));
-  const prod = cust ? (cust.prod || '') : '';
+  // بيانات العميل الكاملة
+  const cust     = customers.find(x => (x.phone||'').replace(/\D/g,'') === (phone||'').replace(/\D/g,''));
+  const prod     = cust ? (cust.prod || '') : '';
   const totalPaid = cust ? cust.payments.reduce((s,p) => s+p.amount, 0) : amount;
 
-  let txt;
-  const tplFn = window.getMsgTemplates || null;
-  const tpl   = tplFn ? tplFn().receipt : null;
+  // حساب المتأخرات: القسط الشهري × عدد الأشهر المتأخرة
+  let overdueAmt = 0;
+  if(cust && cust.monthly && cust.monthly > 0) {
+    const paid   = cust.payments.reduce((s,p) => s+p.amount, 0);
+    const ed     = cust.earlyDiscount || 0;
+    const netRem = (cust.total - cust.down - ed) - paid;
+    // عدد الأقساط المفروض دُفعت لحد دلوقتي
+    const startDate  = cust.receiveDate ? new Date(cust.receiveDate) : new Date(cust.date || Date.now());
+    const monthsPassed = Math.max(0, Math.floor((Date.now() - startDate.getTime()) / (30.44 * 24 * 3600 * 1000)));
+    const expectedPaid = Math.min(cust.monthly * monthsPassed, cust.total - cust.down - ed);
+    overdueAmt = Math.max(0, expectedPaid - paid - amount); // بعد ما خصمنا الدفعة الحالية
+  }
 
+  const refStr      = ref ? `#${ref}` : '—';
+  const overdueStr  = overdueAmt > 0 ? `\nالمطلوب الآن: ${fmt(overdueAmt)} ج.م` : '';
+
+  // بناء الرسالة مباشرة — لا تعتمد على القالب المحفوظ عشان يتجنب مشاكل المتغيرات القديمة
+  // لو المستخدم عدّل القالب من نافذة القوالب، نستخدمه بس بعد التحقق من خلوه من المتغيرات القديمة
+  const tplFn  = window.getMsgTemplates || null;
+  const tplRaw = tplFn ? tplFn().receipt : '';
+  const hasOldVars = /{{سجل_الدفعات}}|{{إجمالي_مدفوع}}|{{المطلوب}}/.test(tplRaw);
+  const tpl = (tplRaw && !hasOldVars) ? tplRaw : null;
+
+  let txt;
   if(tpl) {
-    const payLine = `${dateStr}  ${fmt(amount)} ج.م${ref?' (#'+ref+')':''}\n`;
     txt = tpl
       .replace(/{{اسم_العميل}}/g, name)
       .replace(/{{المنتج}}/g, prod)
-      .replace(/{{سجل_الدفعات}}/g, payLine)
-      .replace(/{{إجمالي_مدفوع}}/g, fmt(totalPaid))
+      .replace(/{{مبلغ_الدفعة}}/g, fmt(amount))
+      .replace(/{{رقم_العملية}}/g, refStr)
+      .replace(/{{التاريخ}}/g, dateStr)
       .replace(/{{إجمالي_متبقي}}/g, fmt(rem))
-      .replace(/{{المطلوب}}/g, fmt(rem));
+      .replace(/{{سطر_المتأخرات}}/g, overdueStr);
   } else {
-    txt = `OPERA STORE\nإيصال استلام قسط${refLine}\n------------------------------\nالتاريخ: ${dateStr}\nالعميل: ${name}\nتم استلام مبلغ: ${fmt(amount)} ج.م\nالمبلغ المتبقي: ${fmt(rem)} ج.م\n-------------------------------\nللتواصل: 01009144655 - 01500041020\nشكراً لتعاملكم معنا.`;
+    txt = `العميل: ${name}\nالمنتج: (${prod})\n------\nتم استلام مبلغ: ${fmt(amount)} ج.م\nرقم العملية: ${refStr}\nالتاريخ: ${dateStr}\n------\nالمبلغ المتبقي: ${fmt(rem)} ج.م${overdueStr}\n-------------------------------\nللتواصل: 01009144655 - 01500041020\nشكراً لتعاملكم معنا.\nويمكنك متابعه حسابك من موقعنا\nhttps://opera-store.github.io/opera-customer/`;
   }
   window.open(`https://wa.me/2${phone}?text=${encodeURIComponent(txt)}`,'_blank');
 }
@@ -7101,6 +7120,18 @@ function icSaveSettings() {
     </div>
 
 
+    <!-- قالب الإيصال -->
+    <div style="margin-bottom:20px">
+      <label style="font-size:0.75rem;font-weight:700;color:var(--text);display:block;margin-bottom:4px">
+        <i class="fa-solid fa-receipt" style="color:var(--green)"></i> إيصال القسط
+      </label>
+      <div style="font-size:0.6rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;margin-bottom:6px;line-height:1.8">
+        المتغيرات المتاحة:<br>
+        <span style="color:var(--accent2)">{{اسم_العميل}}</span> — <span style="color:var(--accent2)">{{مبلغ_الدفعة}}</span> — <span style="color:var(--accent2)">{{إجمالي_متبقي}}</span> — <span style="color:var(--accent2)">{{المنتج}}</span>
+      </div>
+      <textarea id="tpl-receipt" rows="10" style="width:100%;padding:10px;background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:'Cairo',sans-serif;font-size:0.82rem;outline:none;resize:vertical;line-height:1.9;direction:rtl"></textarea>
+    </div>
+
     <div style="display:flex;gap:8px">
       <button class="btn btn-green" onclick="saveMsgTemplates()" style="flex:1"><i class="fa-solid fa-check"></i> حفظ</button>
       <button class="btn" onclick="resetMsgTemplates()" style="flex:1;background:var(--surface3);color:var(--muted);border:1px solid var(--border)"><i class="fa-solid fa-rotate-left"></i> إعادة تعيين</button>
@@ -7664,8 +7695,7 @@ const TPL_KEY = 'opera_msg_templates';
 const TPL_DEFAULTS = {
   remind:    `العميل: {{اسم_العميل}}،\nنود تذكيركم بمبلغ {{المبلغ}} ج.م\nمستحق عن ({{عدد_الأقساط}}) قسط متأخر.\nيرجى السداد في أقرب وقت.`,
   alert:     `العميل: {{اسم_العميل}}\nتنبيه بموعد القسط القادم لـ ({{المنتج}})\nبتاريخ {{تاريخ_القسط}} (متبقي {{أيام_متبقية}} يومًا)\nقيمة القسط: {{قيمة_القسط}} ج.م\nومتأخرات سابقة: {{متأخرات}} ج.م`,
-  receipt:   `العميل: {{اسم_العميل}}\nالمنتج: ({{المنتج}})\n------\nسجل المعاملات:\n{{سجل_الدفعات}}------\nإجمالي المدفوع: {{إجمالي_مدفوع}} ج.م\nإجمالي المتبقي: {{إجمالي_متبقي}} ج.م\nالمطلوب: {{المطلوب}} ج.م`,
-  dashboard: `━━━━━━━━━━━━━━━━━━━━━\n📊 تقرير التحليلات — OPERA STORE\n📅 {{تاريخ}}\n━━━━━━━━━━━━━━━━━━━━━\n👥 إجمالي العملاء النشطين: {{إجمالي_عملاء}}\n🔴 المتأخرون: {{متأخرون}} عميل\n💰 إجمالي المحفظة: {{إجمالي_محفظة}} ج.م\n✅ إجمالي المحصّل: {{إجمالي_محصل}} ج.م\n📈 نسبة التحصيل الكلية: {{نسبة_تحصيل}}%\n━━━━━━━━━━━━━━━━━━━━━\n🗓 محصّل هذا الشهر: {{محصل_الشهر}} ج.م\n⚠️ إجمالي المتأخرات: {{إجمالي_متأخرات}} ج.م\n━━━━━━━━━━━━━━━━━━━━━`
+  receipt:   `العميل: {{اسم_العميل}}\nالمنتج: ({{المنتج}})\n------\nتم استلام مبلغ: {{مبلغ_الدفعة}} ج.م\nرقم العملية: {{رقم_العملية}}\nالتاريخ: {{التاريخ}}\n------\nالمبلغ المتبقي: {{إجمالي_متبقي}} ج.م{{سطر_المتأخرات}}\n-------------------------------\nللتواصل: 01009144655 - 01500041020\nشكراً لتعاملكم معنا.\nويمكنك متابعه حسابك من موقعنا\nhttps://opera-store.github.io/opera-customer/`,  dashboard: `━━━━━━━━━━━━━━━━━━━━━\n📊 تقرير التحليلات — OPERA STORE\n📅 {{تاريخ}}\n━━━━━━━━━━━━━━━━━━━━━\n👥 إجمالي العملاء النشطين: {{إجمالي_عملاء}}\n🔴 المتأخرون: {{متأخرون}} عميل\n💰 إجمالي المحفظة: {{إجمالي_محفظة}} ج.م\n✅ إجمالي المحصّل: {{إجمالي_محصل}} ج.م\n📈 نسبة التحصيل الكلية: {{نسبة_تحصيل}}%\n━━━━━━━━━━━━━━━━━━━━━\n🗓 محصّل هذا الشهر: {{محصل_الشهر}} ج.م\n⚠️ إجمالي المتأخرات: {{إجمالي_متأخرات}} ج.م\n━━━━━━━━━━━━━━━━━━━━━`
 };
 
 function getMsgTemplates() {
@@ -7678,7 +7708,9 @@ function openMsgTemplates() {
     const tpl = getMsgTemplates();
     document.getElementById('tpl-remind').value  = tpl.remind  || TPL_DEFAULTS.remind;
     document.getElementById('tpl-alert').value   = tpl.alert   || TPL_DEFAULTS.alert;
-    document.getElementById('tpl-receipt').value = tpl.receipt || TPL_DEFAULTS.receipt;
+    // لو القالب فيه متغيرات قديمة، استخدم الجديد تلقائياً
+    const receiptHasOldVars = /{{سجل_الدفعات}}|{{إجمالي_مدفوع}}|{{المطلوب}}/.test(tpl.receipt||'');
+    document.getElementById('tpl-receipt').value = (tpl.receipt && !receiptHasOldVars) ? tpl.receipt : TPL_DEFAULTS.receipt;
   };
   if(window.fbLoad) {
     window.fbLoad('msg_templates', TPL_KEY).then(data => {
@@ -7707,6 +7739,7 @@ function saveMsgTemplates() {
 function resetMsgTemplates() {
   if(!confirm('إعادة تعيين الرسائل للنصوص الافتراضية؟')) return;
   localStorage.removeItem(TPL_KEY);
+  if(window.fbSave) window.fbSave('msg_templates', TPL_DEFAULTS).catch(()=>{});
   document.getElementById('tpl-remind').value  = TPL_DEFAULTS.remind;
   document.getElementById('tpl-alert').value   = TPL_DEFAULTS.alert;
   document.getElementById('tpl-receipt').value = TPL_DEFAULTS.receipt;
